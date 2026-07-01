@@ -26,7 +26,7 @@ Then open `http://localhost:5173`.
 - `Next gen`: force evolution into the next generation
 - `Reset`: restart training from generation 1
 - `Simulation speed`: run more physics steps per animation frame
-- `Population` and `Mutation`: change the training setup and restart
+- `Population` and `Mutation`: change the training setup and restart. Defaults are 10 birds and a 0.10 mutation rate.
 
 ## Notes
 

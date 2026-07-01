@@ -60,11 +60,11 @@
           <div class="panel-section two-col">
             <label>
               Population
-              <input id="population" type="number" min="12" max="180" step="4" value="60" />
+              <input id="population" type="number" min="10" max="180" step="2" value="10" />
             </label>
             <label>
               Mutation
-              <input id="mutation" type="number" min="0" max="1" step="0.01" value="0.12" />
+              <input id="mutation" type="number" min="0" max="1" step="0.01" value="0.10" />
             </label>
           </div>
 
@@ -86,6 +86,30 @@
           <div class="panel-section">
             <h2>Best neural network</h2>
             <canvas id="network" width="320" height="230" aria-label="Best neural network visualizer"></canvas>
+          </div>
+
+          <div class="panel-section explanation">
+            <h2>Comment les generations apprennent</h2>
+            <p>
+              Chaque bird commence avec son propre petit reseau neuronal. Le reseau recoit cinq
+              valeurs : la hauteur du bird, sa vitesse verticale, la distance jusqu'au prochain
+              tuyau, la distance jusqu'au haut du passage et la distance jusqu'au bas du passage.
+              Il renvoie une seule decision : sauter ou continuer a tomber.
+            </p>
+            <p>
+              Pendant une generation, chaque bird vivant gagne du fitness en survivant, en restant
+              proche du centre du passage et en franchissant des tuyaux. Quand tous les birds se
+              crashent, l'application les classe par fitness. Les meilleurs sont copies dans la
+              generation suivante, puis de nouveaux birds sont crees en melangeant deux bons
+              reseaux.
+            </p>
+            <p>
+              La mutation modifie quelques poids neuronaux avec de petits changements aleatoires.
+              C'est pour cela que les birds agissent differemment : certains sautent plus tot,
+              d'autres attendent plus longtemps, d'autres reagissent davantage a la vitesse
+              verticale. Generation apres generation, les comportements utiles survivent plus
+              souvent et les mauvaises reactions disparaissent.
+            </p>
           </div>
         </aside>
       </section>

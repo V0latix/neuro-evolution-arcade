@@ -222,6 +222,17 @@ input[type="number"] {
   border-bottom: 0;
 }
 
+.explanation p {
+  margin: 0 0 12px;
+  color: #31424a;
+  font-size: 0.92rem;
+  line-height: 1.5;
+}
+
+.explanation p:last-child {
+  margin-bottom: 0;
+}
+
 #network {
   width: 100%;
   height: auto;
