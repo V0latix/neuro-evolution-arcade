@@ -38,15 +38,54 @@
       </section>
 
       <section class="sim-grid">
-        <div class="stage-wrap">
-          <canvas id="game" width="960" height="560" aria-label="AI Flappy Bird simulation"></canvas>
+        <div class="main-column">
+          <div class="stage-wrap">
+            <canvas id="game" width="960" height="560" aria-label="AI Flappy Bird simulation"></canvas>
+          </div>
+
+          <section class="panel-section explanation">
+            <h2>Comment les generations apprennent</h2>
+            <p>
+              Chaque bird commence avec son propre petit reseau neuronal. Le reseau recoit six
+              valeurs : la hauteur du bird, sa vitesse verticale, la distance jusqu'au prochain
+              tuyau, la distance jusqu'au haut du passage et la distance jusqu'au bas du passage.
+              Il recoit aussi la distance verticale jusqu'au centre du passage du tuyau suivant.
+              Il renvoie une seule decision : sauter ou continuer a tomber.
+            </p>
+            <p>
+              Le passage des tuyaux change la hauteur disponible entre le tuyau du haut et celui du
+              bas. L'espacement des tuyaux change la distance horizontale avant le prochain obstacle.
+              Modifier ces valeurs redemarre l'entrainement pour que toute la generation apprenne
+              sur les memes regles. Le sixieme noeud aide les birds a anticiper le passage qui
+              arrive apres l'obstacle actuel.
+            </p>
+            <p>
+              Pendant une generation, chaque bird vivant gagne du fitness en survivant, en restant
+              proche du centre du passage et en franchissant des tuyaux. Quand tous les birds se
+              crashent, l'application les classe par fitness. Les meilleurs sont copies dans la
+              generation suivante, puis de nouveaux birds sont crees en melangeant deux bons
+              reseaux.
+            </p>
+            <p>
+              La mutation modifie quelques poids neuronaux avec de petits changements aleatoires.
+              C'est pour cela que les birds agissent differemment : certains sautent plus tot,
+              d'autres attendent plus longtemps, d'autres reagissent davantage a la vitesse
+              verticale. Generation apres generation, les comportements utiles survivent plus
+              souvent et les mauvaises reactions disparaissent.
+            </p>
+          </section>
         </div>
 
         <aside class="panel">
           <div class="panel-section controls">
             <button id="toggleRun" type="button">Pause</button>
-            <button id="nextGen" type="button">Next gen</button>
-            <button id="reset" type="button">Reset</button>
+            <button id="nextGen" class="button-secondary" type="button">Next gen</button>
+            <button id="reset" class="button-ghost" type="button">Reset</button>
+          </div>
+
+          <div class="panel-section two-col">
+            <button id="modeAi" class="button-secondary is-active" type="button">AI training</button>
+            <button id="modeHuman" class="button-ghost" type="button">Human play</button>
           </div>
 
           <div class="panel-section">
@@ -80,6 +119,17 @@
           </div>
 
           <div class="panel-section">
+            <label for="preset">Preset difficulte</label>
+            <select id="preset">
+              <option value="custom">Custom</option>
+              <option value="easy">Easy</option>
+              <option value="normal" selected>Normal</option>
+              <option value="hard">Hard</option>
+              <option value="chaos">Chaos</option>
+            </select>
+          </div>
+
+          <div class="panel-section">
             <div class="stat-line">
               <span>Best fitness</span>
               <strong id="bestFitness">0</strong>
@@ -96,39 +146,17 @@
 
           <div class="panel-section">
             <h2>Best neural network</h2>
-            <canvas id="network" width="320" height="230" aria-label="Best neural network visualizer"></canvas>
+            <canvas id="network" width="360" height="250" aria-label="Best neural network visualizer"></canvas>
           </div>
 
-          <div class="panel-section explanation">
-            <h2>Comment les generations apprennent</h2>
-            <p>
-              Chaque bird commence avec son propre petit reseau neuronal. Le reseau recoit six
-              valeurs : la hauteur du bird, sa vitesse verticale, la distance jusqu'au prochain
-              tuyau, la distance jusqu'au haut du passage et la distance jusqu'au bas du passage.
-              Il recoit aussi la distance verticale jusqu'au centre du passage du tuyau suivant.
-              Il renvoie une seule decision : sauter ou continuer a tomber.
-            </p>
-            <p>
-              Le passage des tuyaux change la hauteur disponible entre le tuyau du haut et celui du
-              bas. L'espacement des tuyaux change la distance horizontale avant le prochain obstacle.
-              Modifier ces valeurs redemarre l'entrainement pour que toute la generation apprenne
-              sur les memes regles. Le sixieme noeud aide les birds a anticiper le passage qui
-              arrive apres l'obstacle actuel.
-            </p>
-            <p>
-              Pendant une generation, chaque bird vivant gagne du fitness en survivant, en restant
-              proche du centre du passage et en franchissant des tuyaux. Quand tous les birds se
-              crashent, l'application les classe par fitness. Les meilleurs sont copies dans la
-              generation suivante, puis de nouveaux birds sont crees en melangeant deux bons
-              reseaux.
-            </p>
-            <p>
-              La mutation modifie quelques poids neuronaux avec de petits changements aleatoires.
-              C'est pour cela que les birds agissent differemment : certains sautent plus tot,
-              d'autres attendent plus longtemps, d'autres reagissent davantage a la vitesse
-              verticale. Generation apres generation, les comportements utiles survivent plus
-              souvent et les mauvaises reactions disparaissent.
-            </p>
+          <div class="panel-section">
+            <h2>Champion</h2>
+            <div class="controls champion-controls">
+              <button id="saveChampion" type="button">Save</button>
+              <button id="loadChampion" class="button-secondary" type="button">Load</button>
+              <button id="clearChampion" class="button-ghost" type="button">Clear</button>
+            </div>
+            <p id="championStatus" class="status-text">No champion saved yet.</p>
           </div>
         </aside>
       </section>

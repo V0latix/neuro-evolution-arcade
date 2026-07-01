@@ -10,6 +10,9 @@ The app runs entirely in the browser:
 - Generation-by-generation training
 - Live metrics and a neural-network visualizer for the current champion
 - Six neural-network inputs, including the distance to the following pipe gap
+- Human play mode with the space bar
+- Local champion save/load via browser storage
+- Difficulty presets for pipe gap, pipe spacing, speed, and mutation
 
 ## Run locally
 
@@ -30,6 +33,9 @@ Then open `http://localhost:5173`.
 - `Population` and `Mutation`: change the training setup and restart. Defaults are 10 birds and a 0.10 mutation rate.
 - `Passage tuyaux`: change the vertical opening between the upper and lower pipe
 - `Espacement tuyaux`: change the horizontal distance between consecutive pipes
+- `Human play`: switch to manual play, then press `Space` to flap
+- `Save` / `Load` / `Clear`: manage the best saved champion in local browser storage
+- `Preset difficulte`: apply easy, normal, hard, or chaos training settings
 
 ## Notes
 

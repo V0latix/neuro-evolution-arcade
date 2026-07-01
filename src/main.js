@@ -14,12 +14,19 @@ const ui = {
   toggleRun: document.querySelector("#toggleRun"),
   nextGen: document.querySelector("#nextGen"),
   reset: document.querySelector("#reset"),
+  modeAi: document.querySelector("#modeAi"),
+  modeHuman: document.querySelector("#modeHuman"),
   speed: document.querySelector("#speed"),
   speedValue: document.querySelector("#speedValue"),
   population: document.querySelector("#population"),
   mutation: document.querySelector("#mutation"),
   pipeGap: document.querySelector("#pipeGap"),
   pipeSpacing: document.querySelector("#pipeSpacing"),
+  preset: document.querySelector("#preset"),
+  saveChampion: document.querySelector("#saveChampion"),
+  loadChampion: document.querySelector("#loadChampion"),
+  clearChampion: document.querySelector("#clearChampion"),
+  championStatus: document.querySelector("#championStatus"),
 };
 
 const WIDTH = 960;
@@ -33,10 +40,20 @@ const FLAP = -7.2;
 const INPUTS = 6;
 const HIDDEN = 7;
 const GENOME_LENGTH = INPUTS * HIDDEN + HIDDEN + HIDDEN + 1;
+const CHAMPION_STORAGE_KEY = "ai-flappy-evolution.champion";
+const INPUT_LABELS = ["height", "velocity", "pipe x", "gap top", "gap bottom", "next gap"];
+const PRESETS = {
+  easy: { speed: 2, mutation: 0.08, pipeGap: 190, pipeSpacing: 305 },
+  normal: { speed: 3, mutation: 0.1, pipeGap: 150, pipeSpacing: 245 },
+  hard: { speed: 4, mutation: 0.12, pipeGap: 120, pipeSpacing: 215 },
+  chaos: { speed: 5, mutation: 0.18, pipeGap: 105, pipeSpacing: 180 },
+};
 
 let running = true;
+let playMode = "ai";
 let generation = 1;
 let population = [];
+let humanBird = null;
 let pipes = [];
 let frame = 0;
 let score = 0;
@@ -133,6 +150,18 @@ function createPipe(x) {
 
 function setupPopulation(size = Number(ui.population.value)) {
   population = Array.from({ length: size }, () => makeBird());
+  if (bestGenome && population.length > 0) {
+    population[0] = makeBird(cloneGenome(bestGenome));
+  }
+  resetPipes();
+  frame = 0;
+  score = 0;
+}
+
+function setupHumanRun() {
+  humanBird = makeBird();
+  humanBird.hue = 205;
+  population = [];
   resetPipes();
   frame = 0;
   score = 0;
@@ -205,6 +234,35 @@ function updateBird(bird) {
   }
 }
 
+function updateHumanBird() {
+  if (!humanBird || !humanBird.alive) return;
+
+  humanBird.vy += GRAVITY;
+  humanBird.y += humanBird.vy;
+  humanBird.age += 1;
+
+  if (humanBird.y - humanBird.radius < 0 || humanBird.y + humanBird.radius > HEIGHT - GROUND) {
+    humanBird.alive = false;
+  }
+
+  for (const candidate of pipes) {
+    if (collide(humanBird, candidate)) {
+      humanBird.alive = false;
+      break;
+    }
+
+    if (!candidate.passedBy.has(humanBird.id) && candidate.x + PIPE_WIDTH < humanBird.x) {
+      candidate.passedBy.add(humanBird.id);
+      humanBird.passed += 1;
+    }
+  }
+
+  if (!humanBird.alive) {
+    running = false;
+    ui.toggleRun.textContent = "Resume";
+  }
+}
+
 function updatePipes() {
   for (const pipe of pipes) {
     pipe.x -= PIPE_SPEED;
@@ -214,10 +272,6 @@ function updatePipes() {
     pipes.shift();
     pipes.push(createPipe(pipes[pipes.length - 1].x + pipeSpacing()));
   }
-
-  const liveScores = population.map((bird) => bird.passed);
-  score = Math.max(0, ...liveScores);
-  bestScore = Math.max(bestScore, score);
 }
 
 function tournament(sorted) {
@@ -282,13 +336,34 @@ function evolve() {
   score = 0;
 }
 
-function step() {
+function stepAi() {
   frame += 1;
   updatePipes();
   for (const bird of population) updateBird(bird);
 
+  const liveScores = population.map((bird) => bird.passed);
+  score = Math.max(0, ...liveScores);
+  bestScore = Math.max(bestScore, score);
+
   const alive = population.filter((bird) => bird.alive).length;
   if (alive === 0) evolve();
+}
+
+function stepHuman() {
+  frame += 1;
+  updatePipes();
+  updateHumanBird();
+  score = humanBird ? humanBird.passed : 0;
+  bestScore = Math.max(bestScore, score);
+}
+
+function step() {
+  if (playMode === "human") {
+    stepHuman();
+    return;
+  }
+
+  stepAi();
 }
 
 function drawBackground() {
@@ -372,6 +447,7 @@ function drawBird(bird, index) {
 }
 
 function drawOverlay() {
+  if (playMode !== "ai") return;
   const leader = [...population].sort((a, b) => b.fitness - a.fitness)[0];
   const pipe = leader ? nextPipeFor(leader) : pipes[0];
   if (leader && leader.alive && pipe) {
@@ -390,26 +466,47 @@ function drawGame() {
   for (const pipe of pipes) drawPipe(pipe);
   drawOverlay();
 
-  const liveBirds = population.filter((bird) => bird.alive).sort((a, b) => b.fitness - a.fitness);
-  liveBirds.slice(0, 40).forEach(drawBird);
+  if (playMode === "human") {
+    if (humanBird) drawBird(humanBird, 0);
+  } else {
+    const liveBirds = population.filter((bird) => bird.alive).sort((a, b) => b.fitness - a.fitness);
+    liveBirds.slice(0, 40).forEach(drawBird);
+  }
 
   ctx.fillStyle = "rgba(255,255,255,0.78)";
   ctx.fillRect(18, 18, 168, 54);
   ctx.fillStyle = "#172026";
   ctx.font = "700 24px system-ui";
   ctx.fillText(`Score ${score}`, 34, 52);
+
+  if (playMode === "human" && humanBird && !humanBird.alive) {
+    ctx.fillStyle = "rgba(255,255,255,0.9)";
+    ctx.fillRect(WIDTH / 2 - 190, HEIGHT / 2 - 54, 380, 108);
+    ctx.fillStyle = "#172026";
+    ctx.textAlign = "center";
+    ctx.font = "800 28px system-ui";
+    ctx.fillText("Crashed", WIDTH / 2, HEIGHT / 2 - 10);
+    ctx.font = "600 16px system-ui";
+    ctx.fillText("Press Space or Reset to play again", WIDTH / 2, HEIGHT / 2 + 22);
+    ctx.textAlign = "left";
+  }
 }
 
 function drawNetwork() {
   netCtx.clearRect(0, 0, networkCanvas.width, networkCanvas.height);
+  if (playMode === "human") {
+    drawNetworkEmptyState();
+    return;
+  }
+
   const liveLeader = [...population].sort((a, b) => b.fitness - a.fitness)[0];
   const genome = liveLeader?.genome || leaderGenome || bestGenome;
   if (!genome) return;
 
   const layers = [
-    { x: 42, count: INPUTS, label: "Inputs" },
-    { x: 160, count: HIDDEN, label: "Hidden" },
-    { x: 280, count: 1, label: "Flap" },
+    { x: 122, count: INPUTS, label: "Inputs" },
+    { x: 238, count: HIDDEN, label: "Hidden" },
+    { x: 326, count: 1, label: "Flap" },
   ];
 
   const points = layers.map((layer) => {
@@ -438,7 +535,7 @@ function drawNetwork() {
   }
 
   for (const layer of points) {
-    for (const point of layer) {
+    for (const [index, point] of layer.entries()) {
       netCtx.fillStyle = "#fff";
       netCtx.strokeStyle = "#172026";
       netCtx.lineWidth = 2;
@@ -446,8 +543,21 @@ function drawNetwork() {
       netCtx.arc(point.x, point.y, 8, 0, Math.PI * 2);
       netCtx.fill();
       netCtx.stroke();
+
+      if (layer === points[0]) {
+        netCtx.fillStyle = "#31424a";
+        netCtx.font = "11px system-ui";
+        netCtx.textAlign = "left";
+        netCtx.fillText(INPUT_LABELS[index], 8, point.y + 4);
+      }
     }
   }
+
+  netCtx.fillStyle = "#31424a";
+  netCtx.font = "12px system-ui";
+  netCtx.textAlign = "center";
+  netCtx.fillText("flap", points[2][0].x, points[2][0].y + 25);
+  netCtx.textAlign = "left";
 }
 
 function drawConnection(from, to, weight) {
@@ -460,23 +570,34 @@ function drawConnection(from, to, weight) {
   netCtx.stroke();
 }
 
+function drawNetworkEmptyState() {
+  netCtx.fillStyle = "#31424a";
+  netCtx.font = "600 15px system-ui";
+  netCtx.textAlign = "center";
+  netCtx.fillText("Human play mode", networkCanvas.width / 2, 112);
+  netCtx.font = "13px system-ui";
+  netCtx.fillText("Switch to AI training to view the network.", networkCanvas.width / 2, 136);
+  netCtx.textAlign = "left";
+}
+
 function updateUi() {
-  const alive = population.filter((bird) => bird.alive).length;
-  const leader = [...population].sort((a, b) => b.fitness - a.fitness)[0];
+  const alive = playMode === "human" ? Number(Boolean(humanBird?.alive)) : population.filter((bird) => bird.alive).length;
+  const leader = playMode === "ai" ? [...population].sort((a, b) => b.fitness - a.fitness)[0] : humanBird;
   const pipe = leader ? nextPipeFor(leader) : pipes[0];
 
-  ui.generation.textContent = generation;
+  ui.generation.textContent = playMode === "human" ? "Human" : generation;
   ui.alive.textContent = alive;
   ui.score.textContent = score;
   ui.bestScore.textContent = bestScore;
-  ui.bestFitness.textContent = Math.round(bestFitness);
-  ui.leaderFitness.textContent = leader ? Math.round(leader.fitness) : 0;
+  ui.bestFitness.textContent = playMode === "human" ? "-" : Math.round(bestFitness);
+  ui.leaderFitness.textContent =
+    playMode === "human" ? "-" : leader ? Math.round(leader.fitness) : 0;
   ui.pipeDistance.textContent = leader && pipe ? Math.max(0, Math.round(pipe.x - leader.x)) : 0;
 }
 
 function loop() {
   if (running) {
-    const steps = Number(ui.speed.value);
+    const steps = playMode === "human" ? 1 : Number(ui.speed.value);
     for (let i = 0; i < steps; i += 1) step();
   }
 
@@ -487,27 +608,170 @@ function loop() {
 }
 
 function resetAll() {
+  running = true;
+  ui.toggleRun.textContent = "Pause";
+  bestScore = 0;
+  if (playMode === "human") {
+    setupHumanRun();
+    return;
+  }
+
+  restartTraining(true);
+}
+
+function restartTraining(clearChampion = true) {
   generation = 1;
   bestScore = 0;
-  bestFitness = 0;
-  bestGenome = null;
-  leaderGenome = null;
+  bestFitness = clearChampion ? 0 : bestFitness;
+  if (clearChampion) {
+    bestGenome = null;
+    leaderGenome = null;
+  }
   setupPopulation();
 }
 
+function updateModeButtons() {
+  ui.modeAi.classList.toggle("is-active", playMode === "ai");
+  ui.modeHuman.classList.toggle("is-active", playMode === "human");
+  ui.nextGen.disabled = playMode === "human";
+  ui.saveChampion.disabled = playMode === "human";
+}
+
+function setMode(mode) {
+  if (playMode === mode) return;
+  playMode = mode;
+  running = true;
+  ui.toggleRun.textContent = "Pause";
+  updateModeButtons();
+  resetAll();
+}
+
+function applyPreset(name) {
+  const preset = PRESETS[name];
+  if (!preset) return;
+
+  ui.speed.value = preset.speed;
+  ui.speedValue.textContent = `${preset.speed}x`;
+  ui.mutation.value = preset.mutation.toFixed(2);
+  ui.pipeGap.value = preset.pipeGap;
+  ui.pipeSpacing.value = preset.pipeSpacing;
+  resetAll();
+}
+
+function currentChampionGenome() {
+  const leader = [...population].sort((a, b) => b.fitness - a.fitness)[0];
+  return bestGenome || leaderGenome || leader?.genome || null;
+}
+
+function setChampionStatus(message) {
+  ui.championStatus.textContent = message;
+}
+
+function saveChampion() {
+  const genome = currentChampionGenome();
+  if (!genome) {
+    setChampionStatus("No AI champion available yet.");
+    return;
+  }
+
+  const payload = {
+    genome,
+    bestFitness,
+    bestScore,
+    inputs: INPUTS,
+    hidden: HIDDEN,
+    savedAt: new Date().toISOString(),
+  };
+  localStorage.setItem(CHAMPION_STORAGE_KEY, JSON.stringify(payload));
+  setChampionStatus(`Champion saved locally. Fitness ${Math.round(bestFitness)}.`);
+}
+
+function loadChampion() {
+  const raw = localStorage.getItem(CHAMPION_STORAGE_KEY);
+  if (!raw) {
+    setChampionStatus("No champion saved yet.");
+    return;
+  }
+
+  try {
+    const payload = JSON.parse(raw);
+    if (!Array.isArray(payload.genome) || payload.genome.length !== GENOME_LENGTH) {
+      setChampionStatus("Saved champion is incompatible with this network.");
+      return;
+    }
+
+    playMode = "ai";
+    updateModeButtons();
+    running = true;
+    ui.toggleRun.textContent = "Pause";
+    bestGenome = cloneGenome(payload.genome);
+    leaderGenome = cloneGenome(payload.genome);
+    bestFitness = Number(payload.bestFitness) || 0;
+    bestScore = Number(payload.bestScore) || 0;
+    generation = 1;
+    setupPopulation();
+    setChampionStatus(`Champion loaded. Fitness ${Math.round(bestFitness)}.`);
+  } catch {
+    setChampionStatus("Saved champion could not be loaded.");
+  }
+}
+
+function clearChampion() {
+  localStorage.removeItem(CHAMPION_STORAGE_KEY);
+  setChampionStatus("Saved champion cleared.");
+}
+
+function humanFlap() {
+  if (playMode !== "human") return;
+
+  if (!humanBird || !humanBird.alive) {
+    running = true;
+    ui.toggleRun.textContent = "Pause";
+    setupHumanRun();
+    return;
+  }
+
+  humanBird.vy = FLAP;
+}
+
 ui.toggleRun.addEventListener("click", () => {
+  if (playMode === "human" && humanBird && !humanBird.alive) {
+    setupHumanRun();
+  }
   running = !running;
   ui.toggleRun.textContent = running ? "Pause" : "Resume";
 });
 
 ui.nextGen.addEventListener("click", evolve);
 ui.reset.addEventListener("click", resetAll);
+ui.modeAi.addEventListener("click", () => setMode("ai"));
+ui.modeHuman.addEventListener("click", () => setMode("human"));
 ui.speed.addEventListener("input", () => {
   ui.speedValue.textContent = `${ui.speed.value}x`;
+  ui.preset.value = "custom";
 });
 ui.population.addEventListener("change", resetAll);
-ui.pipeGap.addEventListener("change", resetAll);
-ui.pipeSpacing.addEventListener("change", resetAll);
+ui.mutation.addEventListener("change", () => {
+  ui.preset.value = "custom";
+});
+ui.pipeGap.addEventListener("change", () => {
+  ui.preset.value = "custom";
+  resetAll();
+});
+ui.pipeSpacing.addEventListener("change", () => {
+  ui.preset.value = "custom";
+  resetAll();
+});
+ui.preset.addEventListener("change", () => applyPreset(ui.preset.value));
+ui.saveChampion.addEventListener("click", saveChampion);
+ui.loadChampion.addEventListener("click", loadChampion);
+ui.clearChampion.addEventListener("click", clearChampion);
+window.addEventListener("keydown", (event) => {
+  if (event.code !== "Space") return;
+  event.preventDefault();
+  humanFlap();
+});
 
+updateModeButtons();
 setupPopulation();
 requestAnimationFrame(loop);

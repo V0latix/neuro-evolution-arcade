@@ -50,15 +50,25 @@ button:hover {
   background: #263942;
 }
 
-button:nth-child(2) {
+.button-secondary {
   background: var(--blue);
   border-color: var(--blue);
 }
 
-button:nth-child(3) {
+.button-ghost {
   background: #fff;
   color: var(--ink);
   border-color: var(--line);
+}
+
+button.is-active {
+  background: var(--leaf);
+  border-color: var(--leaf-dark);
+}
+
+button:disabled {
+  cursor: not-allowed;
+  opacity: 0.48;
 }
 
 .app-shell {
@@ -149,6 +159,12 @@ label {
   align-items: start;
 }
 
+.main-column {
+  display: grid;
+  min-width: 0;
+  gap: 14px;
+}
+
 .stage-wrap {
   min-width: 0;
   border: 1px solid var(--line);
@@ -204,6 +220,17 @@ input[type="number"] {
   padding: 10px;
 }
 
+select {
+  width: 100%;
+  margin-top: 8px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fff;
+  color: var(--ink);
+  padding: 10px;
+  font: inherit;
+}
+
 .two-col {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -231,6 +258,17 @@ input[type="number"] {
 
 .explanation p:last-child {
   margin-bottom: 0;
+}
+
+.status-text {
+  margin: 10px 0 0;
+  color: var(--muted);
+  font-size: 0.86rem;
+  line-height: 1.45;
+}
+
+.champion-controls {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 
 #network {
