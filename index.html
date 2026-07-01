@@ -23,7 +23,7 @@
             <strong id="generation">1</strong>
           </div>
           <div class="metric">
-            <span>Alive</span>
+            <span id="aliveLabel">Alive</span>
             <strong id="alive">0</strong>
           </div>
           <div class="metric">
@@ -102,14 +102,22 @@
             <h2>Comment Snake apprend</h2>
             <p>
               Chaque snake possede un reseau neuronal different. Le reseau observe les dangers
-              devant lui, a gauche et a droite, la position relative de la nourriture, sa direction
-              actuelle et sa longueur. Il ne choisit pas une case directement : il decide de tourner
-              a gauche, continuer tout droit ou tourner a droite.
+              devant lui, a gauche et a droite, la nourriture relative a sa direction, l'espace
+              libre devant lui et sa longueur. Il ne choisit pas une case directement : il decide
+              de tourner a gauche, continuer tout droit ou tourner a droite.
+            </p>
+            <p>
+              Une generation Snake est testee specimen par specimen. Le premier snake joue une
+              partie complete dans sa propre grille, puis le deuxieme demarre une nouvelle partie,
+              et ainsi de suite jusqu'a ce que toute la population ait ete evaluee. Le compteur
+              Specimen indique cette progression.
             </p>
             <p>
               Quand un snake se rapproche de la nourriture, il gagne un peu de fitness. Quand il
-              mange, il gagne beaucoup plus de fitness et son corps grandit. S'il touche un mur,
-              son corps ou s'il reste trop longtemps sans manger, il meurt et son score s'arrete.
+              mange, il gagne beaucoup plus de fitness et son corps grandit. Les boucles repetees
+              sont penalisees pour eviter qu'un specimen tourne en rond sans progresser. S'il touche
+              un mur, son corps ou s'il reste trop longtemps sans manger, il meurt et son score
+              s'arrete.
             </p>
             <p>
               A la fin d'une generation, les snakes les plus efficaces sont conserves. Les autres
@@ -133,7 +141,7 @@
           </div>
 
           <div class="panel-section">
-            <label for="speed">Simulation speed</label>
+            <label id="speedLabel" for="speed">Simulation speed</label>
             <div class="range-row">
               <input id="speed" type="range" min="1" max="12" step="1" value="3" />
               <output id="speedValue" for="speed">3x</output>
@@ -142,7 +150,7 @@
 
           <div class="panel-section two-col">
             <label>
-              Population
+              <span id="populationLabel">Population</span>
               <input id="population" type="number" min="10" max="180" step="2" value="10" />
             </label>
             <label>
@@ -173,7 +181,7 @@
             </label>
           </div>
 
-          <div class="panel-section">
+          <div id="presetPanel" class="panel-section">
             <label for="preset">Preset difficulte</label>
             <select id="preset">
               <option value="custom">Custom</option>
@@ -190,7 +198,7 @@
               <strong id="bestFitness">0</strong>
             </div>
             <div class="stat-line">
-              <span>Current leader</span>
+              <span id="leaderFitnessLabel">Current leader</span>
               <strong id="leaderFitness">0</strong>
             </div>
             <div class="stat-line">

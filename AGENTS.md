@@ -78,6 +78,12 @@ and champion storage keys.
   when the AI speed slider is higher. This keeps keyboard control playable.
 - Game switching resets the current run and activates only the selected game's
   settings and explanation panel.
+- Snake uses sequential evaluation. Only one specimen is active at a time; when
+  it dies, the next specimen starts a fresh Snake board. The generation evolves
+  only after every specimen has been evaluated.
+- Snake's right-side controls intentionally differ from Pipe Runner: the metric
+  label changes to `Specimen`, the speed slider has a higher maximum, and pipe
+  presets are hidden.
 - Pipe gap and pipe spacing reset the current run so one generation is not
   scored across mixed difficulty settings.
 - Snake grid size and food patience reset the current Snake run for the same

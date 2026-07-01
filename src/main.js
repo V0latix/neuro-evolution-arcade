@@ -5,10 +5,12 @@ const netCtx = networkCanvas.getContext("2d");
 
 const ui = {
   generation: document.querySelector("#generation"),
+  aliveLabel: document.querySelector("#aliveLabel"),
   alive: document.querySelector("#alive"),
   score: document.querySelector("#score"),
   bestScore: document.querySelector("#bestScore"),
   bestFitness: document.querySelector("#bestFitness"),
+  leaderFitnessLabel: document.querySelector("#leaderFitnessLabel"),
   leaderFitness: document.querySelector("#leaderFitness"),
   distanceMetric: document.querySelector("#pipeDistance"),
   distanceLabel: document.querySelector("#distanceLabel"),
@@ -22,8 +24,10 @@ const ui = {
   activeGameTitle: document.querySelector("#activeGameTitle"),
   gameObjective: document.querySelector("#gameObjective"),
   gameHint: document.querySelector("#gameHint"),
+  speedLabel: document.querySelector("#speedLabel"),
   speed: document.querySelector("#speed"),
   speedValue: document.querySelector("#speedValue"),
+  populationLabel: document.querySelector("#populationLabel"),
   population: document.querySelector("#population"),
   mutation: document.querySelector("#mutation"),
   pipeSettings: document.querySelector("#pipeSettings"),
@@ -32,6 +36,7 @@ const ui = {
   snakeSettings: document.querySelector("#snakeSettings"),
   snakeGrid: document.querySelector("#snakeGrid"),
   snakePatience: document.querySelector("#snakePatience"),
+  presetPanel: document.querySelector("#presetPanel"),
   preset: document.querySelector("#preset"),
   saveChampion: document.querySelector("#saveChampion"),
   loadChampion: document.querySelector("#loadChampion"),
@@ -62,7 +67,18 @@ const PRESETS = {
 };
 
 const PIPE_INPUT_LABELS = ["height", "velocity", "pipe x", "gap top", "gap bottom", "next gap"];
-const SNAKE_INPUT_LABELS = ["danger F", "danger L", "danger R", "food x", "food y", "dir x", "dir y", "length"];
+const SNAKE_INPUT_LABELS = [
+  "danger F",
+  "danger L",
+  "danger R",
+  "food F",
+  "food L",
+  "food R",
+  "space F",
+  "space L",
+  "space R",
+  "length",
+];
 
 const games = {
   pipe: createPipeGame(),
@@ -139,6 +155,30 @@ function makeAgent(genome = createGenome()) {
   return game.makeAgent(agentIdSequence++, genome);
 }
 
+function activeAgent() {
+  if (!game.sequential) return null;
+  return agents[world?.activeAgentIndex || 0] || null;
+}
+
+function aiDisplayAgents() {
+  if (!game.sequential) return agents;
+  return activeAgent() ? [activeAgent()] : [];
+}
+
+function displayLeader() {
+  if (playMode === "human") return humanAgent;
+  if (game.sequential) return activeAgent() || [...agents].sort((a, b) => b.fitness - a.fitness)[0];
+  return [...agents].sort((a, b) => b.fitness - a.fitness)[0];
+}
+
+function startSequentialAgent() {
+  if (!game.sequential) return;
+  const agent = activeAgent();
+  if (agent) game.startAgent(agent, world, world.activeAgentIndex);
+  frame = 0;
+  score = 0;
+}
+
 function setupPopulation(size = Number(ui.population.value)) {
   world = game.createWorld();
   agents = Array.from({ length: size }, () => makeAgent());
@@ -146,6 +186,7 @@ function setupPopulation(size = Number(ui.population.value)) {
     agents[0] = makeAgent(cloneGenome(bestGenome));
   }
   game.resetAgents(agents, world);
+  startSequentialAgent();
   humanAgent = null;
   frame = 0;
   score = 0;
@@ -222,11 +263,17 @@ function evolve() {
   world = game.createWorld();
   agents = next;
   game.resetAgents(agents, world);
+  startSequentialAgent();
   frame = 0;
   score = 0;
 }
 
 function stepAi() {
+  if (game.sequential) {
+    stepSequentialAi();
+    return;
+  }
+
   frame += 1;
   game.stepWorld(world, frame);
   for (const agent of agents) game.updateAgent(agent, world, frame);
@@ -236,6 +283,32 @@ function stepAi() {
 
   const alive = agents.filter((agent) => agent.alive).length;
   if (alive === 0) evolve();
+}
+
+function stepSequentialAi() {
+  const agent = activeAgent();
+  if (!agent) {
+    evolve();
+    return;
+  }
+
+  frame += 1;
+  game.stepWorld(world, frame);
+  if (agent.alive) game.updateAgent(agent, world, frame);
+
+  score = agent.score;
+  bestScore = Math.max(bestScore, score);
+  leaderGenome = cloneGenome(agent.genome);
+
+  if (agent.alive) return;
+
+  if (world.activeAgentIndex < agents.length - 1) {
+    world.activeAgentIndex += 1;
+    startSequentialAgent();
+    return;
+  }
+
+  evolve();
 }
 
 function stepHuman() {
@@ -261,7 +334,7 @@ function step() {
 }
 
 function drawGame() {
-  game.draw(ctx, world, playMode === "human" ? [humanAgent].filter(Boolean) : agents, playMode, score);
+  game.draw(ctx, world, playMode === "human" ? [humanAgent].filter(Boolean) : aiDisplayAgents(), playMode, score);
 }
 
 function drawNetwork() {
@@ -271,7 +344,7 @@ function drawNetwork() {
     return;
   }
 
-  const liveLeader = [...agents].sort((a, b) => b.fitness - a.fitness)[0];
+  const liveLeader = displayLeader();
   const genome = liveLeader?.genome || leaderGenome || bestGenome;
   if (!genome) return;
 
@@ -358,10 +431,11 @@ function drawNetworkEmptyState() {
 
 function updateUi() {
   const alive = playMode === "human" ? Number(Boolean(humanAgent?.alive)) : agents.filter((agent) => agent.alive).length;
-  const leader = playMode === "ai" ? [...agents].sort((a, b) => b.fitness - a.fitness)[0] : humanAgent;
+  const leader = displayLeader();
 
   ui.generation.textContent = playMode === "human" ? "Human" : generation;
-  ui.alive.textContent = alive;
+  ui.alive.textContent =
+    playMode === "ai" && game.sequential ? `${(world?.activeAgentIndex || 0) + 1}/${agents.length}` : alive;
   ui.score.textContent = score;
   ui.bestScore.textContent = bestScore;
   ui.bestFitness.textContent = playMode === "human" ? "-" : Math.round(bestFitness);
@@ -431,6 +505,9 @@ function setGame(nextGameKey) {
   playMode = "ai";
   running = true;
   ui.toggleRun.textContent = "Pause";
+  ui.speed.max = game.maxSpeed;
+  ui.speed.value = game.defaultSpeed;
+  ui.speedValue.textContent = `${ui.speed.value}x`;
   updateGameUi();
   updateModeButtons();
   restartTraining(true);
@@ -443,12 +520,17 @@ function updateGameUi() {
   ui.activeGameTitle.textContent = game.title;
   ui.gameObjective.textContent = game.objective;
   ui.gameHint.textContent = game.hint;
+  ui.aliveLabel.textContent = game.sequential ? "Specimen" : "Alive";
+  ui.speedLabel.textContent = game.speedLabel;
+  ui.populationLabel.textContent = game.populationLabel;
   ui.distanceLabel.textContent = game.distanceLabel;
+  ui.leaderFitnessLabel.textContent = game.leaderFitnessLabel;
   ui.pipeSettings.classList.toggle("is-hidden", activeGameKey !== "pipe");
   ui.snakeSettings.classList.toggle("is-hidden", activeGameKey !== "snake");
   ui.explanationPipe.classList.toggle("is-hidden", activeGameKey !== "pipe");
   ui.explanationSnake.classList.toggle("is-hidden", activeGameKey !== "snake");
   ui.preset.disabled = activeGameKey !== "pipe";
+  ui.presetPanel.classList.toggle("is-hidden", activeGameKey !== "pipe");
 }
 
 function applyPreset(name) {
@@ -745,6 +827,12 @@ function createPipeGame() {
     title: "Pipe Runner",
     objective: "Les agents apprennent a passer entre deux tuyaux en anticipant le passage actuel et le suivant.",
     hint: "IA: evolution automatique. Humain: Espace pour battre des ailes.",
+    sequential: false,
+    defaultSpeed: 3,
+    maxSpeed: 12,
+    speedLabel: "Simulation speed",
+    populationLabel: "Population",
+    leaderFitnessLabel: "Current leader",
     inputs: 6,
     hidden: DEFAULT_HIDDEN,
     outputs: 1,
@@ -912,6 +1000,9 @@ function createSnakeGame() {
     agent.score = 0;
     agent.age = 0;
     agent.stepsSinceFood = 0;
+    agent.lastAction = 1;
+    agent.repeatedTurnCount = 0;
+    agent.visitCounts = new Map(agent.body.map((part) => [`${part.x},${part.y}`, 1]));
   }
 
   function turnLeft(dir) {
@@ -938,18 +1029,37 @@ function createSnakeGame() {
     return Math.abs(a.x - b.x) + Math.abs(a.y - b.y);
   }
 
+  function directionalFood(agent, targetWorld, dir) {
+    const head = agent.body[0];
+    const dx = agent.food.x - head.x;
+    const dy = agent.food.y - head.y;
+    return (dx * dir.x + dy * dir.y) / Math.max(targetWorld.cols, targetWorld.rows);
+  }
+
+  function openSpace(agent, targetWorld, dir) {
+    let cursor = { ...agent.body[0] };
+    let distance = 0;
+    while (true) {
+      cursor = { x: cursor.x + dir.x, y: cursor.y + dir.y };
+      if (hitsWallOrBody(cursor, agent, targetWorld)) break;
+      distance += 1;
+    }
+    return distance / Math.max(targetWorld.cols, targetWorld.rows);
+  }
+
   function inputsFor(agent, targetWorld) {
     const left = turnLeft(agent.dir);
     const right = turnRight(agent.dir);
-    const head = agent.body[0];
     return [
       hitsWallOrBody(nextHead(agent), agent, targetWorld) ? 1 : 0,
       hitsWallOrBody(nextHead(agent, left), agent, targetWorld) ? 1 : 0,
       hitsWallOrBody(nextHead(agent, right), agent, targetWorld) ? 1 : 0,
-      (agent.food.x - head.x) / targetWorld.cols,
-      (agent.food.y - head.y) / targetWorld.rows,
-      agent.dir.x,
-      agent.dir.y,
+      directionalFood(agent, targetWorld, agent.dir),
+      directionalFood(agent, targetWorld, left),
+      directionalFood(agent, targetWorld, right),
+      openSpace(agent, targetWorld, agent.dir),
+      openSpace(agent, targetWorld, left),
+      openSpace(agent, targetWorld, right),
       agent.body.length / (targetWorld.cols * targetWorld.rows),
     ];
   }
@@ -963,6 +1073,13 @@ function createSnakeGame() {
     if (!agent.alive) return;
 
     const previousDistance = manhattan(agent.body[0], agent.food);
+    if (action === agent.lastAction && action !== 1) {
+      agent.repeatedTurnCount += 1;
+    } else {
+      agent.repeatedTurnCount = 0;
+    }
+    agent.lastAction = action;
+
     if (action === 0) agent.dir = turnLeft(agent.dir);
     if (action === 2) agent.dir = turnRight(agent.dir);
 
@@ -970,6 +1087,10 @@ function createSnakeGame() {
     agent.age += 1;
     agent.stepsSinceFood += 1;
     agent.fitness += 1;
+    if (agent.repeatedTurnCount > 2) {
+      agent.fitness -= 10 * agent.repeatedTurnCount;
+      agent.stepsSinceFood += 2;
+    }
 
     if (hitsWallOrBody(head, agent, targetWorld)) {
       agent.alive = false;
@@ -987,6 +1108,14 @@ function createSnakeGame() {
       agent.body.pop();
       const nextDistance = manhattan(head, agent.food);
       agent.fitness += nextDistance < previousDistance ? 6 : -2;
+    }
+
+    const key = `${head.x},${head.y}`;
+    const visitCount = (agent.visitCounts.get(key) || 0) + 1;
+    agent.visitCounts.set(key, visitCount);
+    if (visitCount > 1) {
+      agent.fitness -= visitCount * 5;
+      agent.stepsSinceFood += visitCount;
     }
 
     if (agent.stepsSinceFood > patienceLimit()) {
@@ -1030,8 +1159,14 @@ function createSnakeGame() {
     key: "snake",
     title: "Snake",
     objective: "Les agents apprennent a chercher la nourriture sans heurter les murs ni leur propre corps.",
-    hint: "IA: tourner a gauche, avancer ou tourner a droite. Humain: fleches ou WASD.",
-    inputs: 8,
+    hint: "IA: un specimen joue sa partie complete, puis le suivant est teste. Humain: fleches ou WASD.",
+    sequential: true,
+    defaultSpeed: 18,
+    maxSpeed: 60,
+    speedLabel: "Specimen speed",
+    populationLabel: "Specimens",
+    leaderFitnessLabel: "Current specimen",
+    inputs: 10,
     hidden: 9,
     outputs: 3,
     inputLabels: SNAKE_INPUT_LABELS,
@@ -1044,7 +1179,7 @@ function createSnakeGame() {
     humanNetworkMessage: "Switch to AI training to view the snake network.",
     createWorld() {
       const cols = gridSize();
-      return { cols, rows: Math.max(12, Math.round(cols * 0.66)) };
+      return { cols, rows: Math.max(12, Math.round(cols * 0.66)), activeAgentIndex: 0 };
     },
     makeAgent(id, genome) {
       return {
@@ -1068,7 +1203,18 @@ function createSnakeGame() {
       return agent;
     },
     resetAgents(nextAgents, targetWorld) {
-      for (const agent of nextAgents) resetSnake(agent, targetWorld);
+      targetWorld.activeAgentIndex = 0;
+      for (const agent of nextAgents) {
+        agent.alive = false;
+        agent.fitness = 0;
+        agent.score = 0;
+        agent.age = 0;
+        agent.body = [];
+        agent.food = { x: 0, y: 0 };
+      }
+    },
+    startAgent(agent, targetWorld) {
+      resetSnake(agent, targetWorld);
     },
     resetHuman(agent, targetWorld) {
       resetSnake(agent, targetWorld);
@@ -1181,11 +1327,11 @@ ui.gamePipe.addEventListener("click", () => setGame("pipe"));
 ui.gameSnake.addEventListener("click", () => setGame("snake"));
 ui.speed.addEventListener("input", () => {
   ui.speedValue.textContent = `${ui.speed.value}x`;
-  ui.preset.value = "custom";
+  if (activeGameKey === "pipe") ui.preset.value = "custom";
 });
 ui.population.addEventListener("change", resetAll);
 ui.mutation.addEventListener("change", () => {
-  ui.preset.value = "custom";
+  if (activeGameKey === "pipe") ui.preset.value = "custom";
 });
 ui.pipeGap.addEventListener("change", () => {
   ui.preset.value = "custom";

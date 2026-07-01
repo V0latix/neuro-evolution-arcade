@@ -250,6 +250,7 @@ test("static app includes every primary control and asset reference", async () =
   for (const id of [
     "game",
     "network",
+    "aliveLabel",
     "toggleRun",
     "nextGen",
     "reset",
@@ -260,7 +261,9 @@ test("static app includes every primary control and asset reference", async () =
     "activeGameTitle",
     "gameObjective",
     "gameHint",
+    "speedLabel",
     "speed",
+    "populationLabel",
     "population",
     "mutation",
     "pipeSettings",
@@ -269,7 +272,9 @@ test("static app includes every primary control and asset reference", async () =
     "snakeSettings",
     "snakeGrid",
     "snakePatience",
+    "presetPanel",
     "preset",
+    "leaderFitnessLabel",
     "saveChampion",
     "loadChampion",
     "clearChampion",
@@ -281,7 +286,7 @@ test("static app includes every primary control and asset reference", async () =
   assert.match(html, /Comment Snake apprend/);
   assert.match(html, /Neuro Evolution Arcade/);
   assert.match(script, /inputs: 6/);
-  assert.match(script, /inputs: 8/);
+  assert.match(script, /inputs: 10/);
   assert.match(script, /outputLabels: \["left", "forward", "right"\]/);
   assert.match(script, /next gap/);
 });
@@ -322,19 +327,29 @@ test("game picker switches to Snake with its own controls and network shape", as
   assert.equal(element(harness, "gameSnake").classList.contains("is-active"), true);
   assert.equal(element(harness, "pipeSettings").classList.contains("is-hidden"), true);
   assert.equal(element(harness, "snakeSettings").classList.contains("is-hidden"), false);
+  assert.equal(element(harness, "presetPanel").classList.contains("is-hidden"), true);
+  assert.equal(element(harness, "aliveLabel").textContent, "Specimen");
+  assert.equal(element(harness, "speedLabel").textContent, "Specimen speed");
+  assert.equal(element(harness, "populationLabel").textContent, "Specimens");
+  assert.equal(element(harness, "leaderFitnessLabel").textContent, "Current specimen");
   assert.equal(element(harness, "distanceLabel").textContent, "Food distance");
-  assert.equal(element(harness, "alive").textContent, 10);
+  assert.equal(element(harness, "speed").value, 18);
+  assert.equal(element(harness, "speed").max, 60);
+  assert.equal(element(harness, "speedValue").textContent, "18x");
+  assert.match(String(element(harness, "alive").textContent), /^[1-9]\/10$/);
 
   const networkCalls = element(harness, "network").getContext().calls;
   const labels = networkCalls.filter((call) => call.type === "fillText").map((call) => call.text);
-  assert.deepEqual(labels.slice(0, 8), [
+  assert.deepEqual(labels.slice(0, 10), [
     "danger F",
     "danger L",
     "danger R",
-    "food x",
-    "food y",
-    "dir x",
-    "dir y",
+    "food F",
+    "food L",
+    "food R",
+    "space F",
+    "space L",
+    "space R",
     "length",
   ]);
   assert.equal(labels.includes("left"), true);
@@ -449,8 +464,8 @@ test("Snake champions are saved under the Snake key with compatible genome lengt
   const saved = JSON.parse(harness.storage.getItem(snakeChampionStorageKey));
 
   assert.equal(saved.game, "snake");
-  assert.equal(saved.genome.length, 111);
-  assert.equal(saved.inputs, 8);
+  assert.equal(saved.genome.length, 129);
+  assert.equal(saved.inputs, 10);
   assert.equal(saved.outputs, 3);
 
   element(harness, "loadChampion").click();
@@ -506,7 +521,7 @@ test("Snake-specific controls reset Snake without affecting pipe settings", asyn
   harness.runFrame();
 
   assert.equal(element(harness, "generation").textContent, 1);
-  assert.equal(element(harness, "alive").textContent, 10);
+  assert.match(String(element(harness, "alive").textContent), /^[1-9]\/10$/);
   assert.equal(element(harness, "pipeGap").value, "150");
 });
 

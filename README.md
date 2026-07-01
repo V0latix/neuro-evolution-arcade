@@ -20,7 +20,9 @@ The app currently runs entirely in the browser and includes:
 - Generation-by-generation training
 - Live metrics and a neural-network visualizer for the current champion
 - Pipe Runner with six inputs, including the following pipe gap
-- Snake with eight inputs and three actions: turn left, continue, turn right
+- Snake with ten inputs and three actions: turn left, continue, turn right
+- Sequential Snake evaluation: one specimen plays a full run, then the next
+  specimen starts its own run
 - Human play mode with the space bar for Pipe Runner and arrows/WASD for Snake
 - Local champion save/load via browser storage
 - Pipe Runner difficulty presets for gap, spacing, speed, and mutation
@@ -32,9 +34,11 @@ The app currently runs entirely in the browser and includes:
 velocity, obstacle distance, the current gap, and the next gap. The output is a
 single flap decision.
 
-`Snake` trains grid agents. The network observes danger straight ahead, danger
-to the left, danger to the right, food position, current direction, and length.
-The outputs select one of three relative moves: left, forward, or right.
+`Snake` trains grid agents. The network observes immediate danger straight
+ahead, left, and right; food direction relative to the snake; open space in
+those same directions; and length. The outputs select one of three relative
+moves: left, forward, or right. Snake specimens are evaluated one at a time so
+each agent gets a separate board, food sequence, and fitness score.
 
 ## Next Game Ideas
 
@@ -94,6 +98,8 @@ environment.
 - `Snake`: use arrows or WASD in human mode
 - `Taille grille`: change the Snake board size
 - `Patience nourriture`: change how long Snake agents may survive without food
+- `Specimen speed`: in Snake, run more steps per frame while still testing one
+  specimen at a time
 - `Save` / `Load` / `Clear`: manage the best saved champion in local browser
   storage
 - `Preset difficulte`: apply easy, normal, hard, or chaos training settings
