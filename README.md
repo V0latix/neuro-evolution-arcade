@@ -3,31 +3,43 @@
 Neuro Evolution Arcade is a browser playground for training small neural
 networks to play arcade-style games through neuroevolution.
 
-The first available game is a Flappy-style pipe runner. The long-term direction
-is to add more games that reuse the same learning loop: observe game state,
-decide an action, score fitness, select the strongest agents, cross over their
-networks, mutate weights, and run a new generation.
+The first available game is a Flappy-style pipe runner. Snake is now available
+as the second game. The long-term direction is to add more games that reuse the
+same learning loop: observe game state, decide an action, score fitness, select
+the strongest agents, cross over their networks, mutate weights, and run a new
+generation.
 
-## Current Game: Pipe Runner
+## Current Games
 
-The app currently runs entirely in the browser:
+The app currently runs entirely in the browser and includes:
 
-- Canvas-based pipe runner game loop
-- Population of neural-network-controlled birds
+- Canvas-based Pipe Runner and Snake simulations
+- A game picker that separates game-specific controls and explanations
+- Populations of neural-network-controlled agents
 - Fitness scoring, elite preservation, crossover, and mutation
 - Generation-by-generation training
 - Live metrics and a neural-network visualizer for the current champion
-- Six neural-network inputs, including the distance to the following pipe gap
-- Human play mode with the space bar
+- Pipe Runner with six inputs, including the following pipe gap
+- Snake with eight inputs and three actions: turn left, continue, turn right
+- Human play mode with the space bar for Pipe Runner and arrows/WASD for Snake
 - Local champion save/load via browser storage
-- Difficulty presets for pipe gap, pipe spacing, speed, and mutation
+- Pipe Runner difficulty presets for gap, spacing, speed, and mutation
+- Snake-specific controls for grid size and food patience
+
+## Game Modules
+
+`Pipe Runner` trains flying agents. The network observes height, vertical
+velocity, obstacle distance, the current gap, and the next gap. The output is a
+single flap decision.
+
+`Snake` trains grid agents. The network observes danger straight ahead, danger
+to the left, danger to the right, food position, current direction, and length.
+The outputs select one of three relative moves: left, forward, or right.
 
 ## Next Game Ideas
 
-Strong candidates for future modules:
+Strong candidates for future modules after Snake:
 
-- `Snake`: compact grid state, clear reward signal, good for path planning and
-  food-seeking behavior.
 - `Pong`: simple physics, continuous paddle control, easy to compare AI vs
   human.
 - `Breakout`: adds planning through brick layouts, ball angle, and survival.
@@ -42,10 +54,10 @@ Strong candidates for future modules:
 
 Recommended order:
 
-1. `Snake`, because it is small and makes the multi-game architecture obvious.
-2. `Pong`, because it introduces opponent/player comparison.
-3. `Dino Runner`, because it reuses much of the current side-scroller logic.
-4. `Breakout`, because it adds richer physics and level state.
+1. `Pong`, because it introduces opponent/player comparison.
+2. `Dino Runner`, because it reuses much of the current side-scroller logic.
+3. `Breakout`, because it adds richer physics and level state.
+4. `Lunar Lander Lite`, because it pushes toward continuous control.
 
 ## Run Locally
 
@@ -79,6 +91,9 @@ environment.
 - `Passage tuyaux`: change the vertical opening between the upper and lower pipe
 - `Espacement tuyaux`: change the horizontal distance between consecutive pipes
 - `Human play`: switch to manual play, then press `Space` to flap
+- `Snake`: use arrows or WASD in human mode
+- `Taille grille`: change the Snake board size
+- `Patience nourriture`: change how long Snake agents may survive without food
 - `Save` / `Load` / `Clear`: manage the best saved champion in local browser
   storage
 - `Preset difficulte`: apply easy, normal, hard, or chaos training settings

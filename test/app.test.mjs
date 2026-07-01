@@ -7,8 +7,9 @@ import { pathToFileURL } from "node:url";
 import { promisify } from "node:util";
 
 const root = new URL("../", import.meta.url);
-const championStorageKey = "neuro-evolution-arcade.flappy.champion";
+const pipeChampionStorageKey = "neuro-evolution-arcade.pipe-runner.champion";
 const legacyChampionStorageKey = "ai-flappy-evolution.champion";
+const snakeChampionStorageKey = "neuro-evolution-arcade.snake.champion";
 const execFileAsync = promisify(execFile);
 
 class ClassList {
@@ -145,16 +146,16 @@ function createMockContext() {
 
 function parseElements(html) {
   const elements = new Map();
-  const idPattern = /<([a-zA-Z0-9]+)([^>]*\sid="([^"]+)"[^>]*)>([\s\S]*?)<\/\1>|<([a-zA-Z0-9]+)([^>]*\sid="([^"]+)"[^>]*)\/?>/g;
+  const idPattern = /<([a-zA-Z0-9]+)([^>]*\sid="([^"]+)"[^>]*)>/g;
   let match;
 
   while ((match = idPattern.exec(html))) {
-    const tagName = match[1] || match[5];
-    const attrs = match[2] || match[6] || "";
-    const id = match[3] || match[7];
+    const tagName = match[1];
+    const attrs = match[2] || "";
+    const id = match[3];
     const value = attr(attrs, "value");
     const className = attr(attrs, "class");
-    const textContent = stripTags(match[4] || "");
+    const textContent = closingText(html, match.index, tagName);
 
     elements.set(
       id,
@@ -169,6 +170,13 @@ function parseElements(html) {
   }
 
   return elements;
+}
+
+function closingText(html, startIndex, tagName) {
+  const openEnd = html.indexOf(">", startIndex);
+  const closeStart = html.indexOf(`</${tagName}>`, openEnd);
+  if (openEnd === -1 || closeStart === -1) return "";
+  return stripTags(html.slice(openEnd + 1, closeStart));
 }
 
 function attr(attrs, name) {
@@ -247,11 +255,20 @@ test("static app includes every primary control and asset reference", async () =
     "reset",
     "modeAi",
     "modeHuman",
+    "gamePipe",
+    "gameSnake",
+    "activeGameTitle",
+    "gameObjective",
+    "gameHint",
     "speed",
     "population",
     "mutation",
+    "pipeSettings",
     "pipeGap",
     "pipeSpacing",
+    "snakeSettings",
+    "snakeGrid",
+    "snakePatience",
     "preset",
     "saveChampion",
     "loadChampion",
@@ -261,8 +278,11 @@ test("static app includes every primary control and asset reference", async () =
   }
 
   assert.match(html, /Comment les generations apprennent/);
+  assert.match(html, /Comment Snake apprend/);
   assert.match(html, /Neuro Evolution Arcade/);
-  assert.match(script, /const INPUTS = 6;/);
+  assert.match(script, /inputs: 6/);
+  assert.match(script, /inputs: 8/);
+  assert.match(script, /outputLabels: \["left", "forward", "right"\]/);
   assert.match(script, /next gap/);
 });
 
@@ -275,6 +295,8 @@ test("module boots, draws AI network labels, and reports initial training state"
   assert.equal(element(harness, "alive").textContent, 10);
   assert.equal(element(harness, "score").textContent, 0);
   assert.equal(element(harness, "modeAi").classList.contains("is-active"), true);
+  assert.equal(element(harness, "gamePipe").classList.contains("is-active"), true);
+  assert.equal(element(harness, "snakeSettings").classList.contains("is-hidden"), true);
   assert.equal(element(harness, "nextGen").disabled, false);
 
   const networkCalls = element(harness, "network").getContext().calls;
@@ -288,6 +310,36 @@ test("module boots, draws AI network labels, and reports initial training state"
     "next gap",
   ]);
   assert.equal(labels.includes("flap"), true);
+});
+
+test("game picker switches to Snake with its own controls and network shape", async () => {
+  const harness = await loadHarness();
+
+  element(harness, "gameSnake").click();
+  harness.runFrame();
+
+  assert.equal(element(harness, "activeGameTitle").textContent, "Snake");
+  assert.equal(element(harness, "gameSnake").classList.contains("is-active"), true);
+  assert.equal(element(harness, "pipeSettings").classList.contains("is-hidden"), true);
+  assert.equal(element(harness, "snakeSettings").classList.contains("is-hidden"), false);
+  assert.equal(element(harness, "distanceLabel").textContent, "Food distance");
+  assert.equal(element(harness, "alive").textContent, 10);
+
+  const networkCalls = element(harness, "network").getContext().calls;
+  const labels = networkCalls.filter((call) => call.type === "fillText").map((call) => call.text);
+  assert.deepEqual(labels.slice(0, 8), [
+    "danger F",
+    "danger L",
+    "danger R",
+    "food x",
+    "food y",
+    "dir x",
+    "dir y",
+    "length",
+  ]);
+  assert.equal(labels.includes("left"), true);
+  assert.equal(labels.includes("forward"), true);
+  assert.equal(labels.includes("right"), true);
 });
 
 test("training controls evolve generations and difficulty presets update numeric settings", async () => {
@@ -339,12 +391,37 @@ test("human play mode uses Space, disables AI-only actions, and can return to AI
   assert.equal(element(harness, "nextGen").disabled, false);
 });
 
+test("Snake human mode uses arrow keys and keeps AI-only actions disabled", async () => {
+  const harness = await loadHarness();
+
+  element(harness, "gameSnake").click();
+  element(harness, "modeHuman").click();
+  harness.runFrame();
+
+  assert.equal(element(harness, "generation").textContent, "Human");
+  assert.equal(element(harness, "alive").textContent, 1);
+  assert.equal(element(harness, "nextGen").disabled, true);
+
+  let prevented = false;
+  harness.window.dispatchEvent({
+    type: "keydown",
+    code: "ArrowUp",
+    preventDefault() {
+      prevented = true;
+    },
+  });
+  harness.runFrame(2);
+
+  assert.equal(prevented, true);
+  assert.equal(element(harness, "activeGameTitle").textContent, "Snake");
+});
+
 test("champion save, load, clear, and incompatible payload handling work", async () => {
   const harness = await loadHarness();
   harness.runFrame();
 
   element(harness, "saveChampion").click();
-  const saved = JSON.parse(harness.storage.getItem(championStorageKey));
+  const saved = JSON.parse(harness.storage.getItem(pipeChampionStorageKey));
   assert.equal(saved.genome.length, 57);
   assert.match(element(harness, "championStatus").textContent, /saved locally/);
 
@@ -353,13 +430,32 @@ test("champion save, load, clear, and incompatible payload handling work", async
   assert.match(element(harness, "championStatus").textContent, /loaded/);
   assert.equal(element(harness, "generation").textContent, 1);
 
-  harness.storage.setItem(championStorageKey, JSON.stringify({ genome: [1, 2, 3] }));
+  harness.storage.setItem(pipeChampionStorageKey, JSON.stringify({ genome: [1, 2, 3] }));
   element(harness, "loadChampion").click();
   assert.match(element(harness, "championStatus").textContent, /incompatible/);
 
   element(harness, "clearChampion").click();
-  assert.equal(harness.storage.getItem(championStorageKey), null);
+  assert.equal(harness.storage.getItem(pipeChampionStorageKey), null);
   assert.match(element(harness, "championStatus").textContent, /cleared/);
+});
+
+test("Snake champions are saved under the Snake key with compatible genome length", async () => {
+  const harness = await loadHarness();
+
+  element(harness, "gameSnake").click();
+  harness.runFrame();
+
+  element(harness, "saveChampion").click();
+  const saved = JSON.parse(harness.storage.getItem(snakeChampionStorageKey));
+
+  assert.equal(saved.game, "snake");
+  assert.equal(saved.genome.length, 111);
+  assert.equal(saved.inputs, 8);
+  assert.equal(saved.outputs, 3);
+
+  element(harness, "loadChampion").click();
+  harness.runFrame();
+  assert.match(element(harness, "championStatus").textContent, /Snake champion loaded/);
 });
 
 test("legacy champion storage key remains loadable after project rename", async () => {
@@ -394,6 +490,24 @@ test("pipe controls switch to custom preset and reset the active run", async () 
   assert.equal(element(harness, "preset").value, "custom");
   assert.equal(element(harness, "generation").textContent, 1);
   assert.equal(element(harness, "alive").textContent, 10);
+});
+
+test("Snake-specific controls reset Snake without affecting pipe settings", async () => {
+  const harness = await loadHarness();
+
+  element(harness, "gameSnake").click();
+  harness.runFrame();
+  element(harness, "nextGen").click();
+  harness.runFrame();
+  assert.equal(element(harness, "generation").textContent, 2);
+
+  element(harness, "snakeGrid").value = "28";
+  element(harness, "snakeGrid").dispatchEvent({ type: "change" });
+  harness.runFrame();
+
+  assert.equal(element(harness, "generation").textContent, 1);
+  assert.equal(element(harness, "alive").textContent, 10);
+  assert.equal(element(harness, "pipeGap").value, "150");
 });
 
 test("source files pass Node syntax checks", async () => {

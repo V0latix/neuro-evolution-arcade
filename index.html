@@ -39,11 +39,34 @@
 
       <section class="sim-grid">
         <div class="main-column">
+          <section class="game-picker" aria-label="Game selection">
+            <button id="gamePipe" class="game-tab is-active" type="button">
+              <strong>Pipe Runner</strong>
+              <span>Vol, timing, tuyaux</span>
+            </button>
+            <button id="gameSnake" class="game-tab" type="button">
+              <strong>Snake</strong>
+              <span>Grille, nourriture, survie</span>
+            </button>
+          </section>
+
           <div class="stage-wrap">
             <canvas id="game" width="960" height="560" aria-label="Neuroevolution arcade game simulation"></canvas>
           </div>
 
-          <section class="panel-section explanation">
+          <section class="panel-section game-summary">
+            <div>
+              <p class="eyebrow">Jeu actif</p>
+              <h2 id="activeGameTitle">Pipe Runner</h2>
+            </div>
+            <p id="gameObjective">
+              Les agents apprennent a passer entre deux tuyaux en anticipant le passage actuel et
+              le suivant.
+            </p>
+            <p id="gameHint">IA: evolution automatique. Humain: Espace pour battre des ailes.</p>
+          </section>
+
+          <section id="explanationPipe" class="panel-section explanation">
             <h2>Comment les generations apprennent</h2>
             <p>
               Chaque bird commence avec son propre petit reseau neuronal. Le reseau recoit six
@@ -72,6 +95,27 @@
               d'autres attendent plus longtemps, d'autres reagissent davantage a la vitesse
               verticale. Generation apres generation, les comportements utiles survivent plus
               souvent et les mauvaises reactions disparaissent.
+            </p>
+          </section>
+
+          <section id="explanationSnake" class="panel-section explanation is-hidden">
+            <h2>Comment Snake apprend</h2>
+            <p>
+              Chaque snake possede un reseau neuronal different. Le reseau observe les dangers
+              devant lui, a gauche et a droite, la position relative de la nourriture, sa direction
+              actuelle et sa longueur. Il ne choisit pas une case directement : il decide de tourner
+              a gauche, continuer tout droit ou tourner a droite.
+            </p>
+            <p>
+              Quand un snake se rapproche de la nourriture, il gagne un peu de fitness. Quand il
+              mange, il gagne beaucoup plus de fitness et son corps grandit. S'il touche un mur,
+              son corps ou s'il reste trop longtemps sans manger, il meurt et son score s'arrete.
+            </p>
+            <p>
+              A la fin d'une generation, les snakes les plus efficaces sont conserves. Les autres
+              sont crees par croisement de bons reseaux puis par mutation. Les generations suivantes
+              testent donc des variantes : certains snakes privilegient la securite, d'autres
+              prennent des chemins plus directs vers la nourriture.
             </p>
           </section>
         </div>
@@ -107,7 +151,7 @@
             </label>
           </div>
 
-          <div class="panel-section two-col">
+          <div id="pipeSettings" class="panel-section two-col">
             <label>
               Passage tuyaux
               <input id="pipeGap" type="number" min="95" max="260" step="5" value="150" />
@@ -115,6 +159,17 @@
             <label>
               Espacement tuyaux
               <input id="pipeSpacing" type="number" min="170" max="420" step="5" value="245" />
+            </label>
+          </div>
+
+          <div id="snakeSettings" class="panel-section two-col is-hidden">
+            <label>
+              Taille grille
+              <input id="snakeGrid" type="number" min="16" max="34" step="2" value="24" />
+            </label>
+            <label>
+              Patience nourriture
+              <input id="snakePatience" type="number" min="35" max="220" step="5" value="90" />
             </label>
           </div>
 
@@ -139,7 +194,7 @@
               <strong id="leaderFitness">0</strong>
             </div>
             <div class="stat-line">
-              <span>Pipe distance</span>
+              <span id="distanceLabel">Pipe distance</span>
               <strong id="pipeDistance">0</strong>
             </div>
           </div>

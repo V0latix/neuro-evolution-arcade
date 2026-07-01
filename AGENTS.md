@@ -3,9 +3,9 @@
 ## Project
 
 Neuro Evolution Arcade is a static browser app for training neural-network
-agents on small arcade games through neuroevolution. The current game is a
-Flappy-style pipe runner, but the codebase should evolve toward a multi-game
-lab.
+agents on small arcade games through neuroevolution. It currently includes
+Pipe Runner and Snake, and the codebase should continue evolving as a
+multi-game lab.
 
 The app has no build step and no runtime dependencies. It is served directly
 from `index.html`, `src/main.js`, and `src/styles.css`.
@@ -29,8 +29,8 @@ The test suite lives in `test/app.test.mjs` and uses Node's built-in
 ## Repository Layout
 
 - `index.html`: app structure, controls, and explanatory content
-- `src/main.js`: game loop, neuroevolution, human mode, localStorage champion
-  management, presets, and canvas drawing
+- `src/main.js`: shared neuroevolution loop, game profiles, human mode,
+  localStorage champion management, presets, and canvas drawing
 - `src/styles.css`: responsive layout and control styling
 - `test/app.test.mjs`: regression tests for the main app flows
 - `README.md`: user-facing documentation and game roadmap
@@ -54,7 +54,8 @@ The test suite lives in `test/app.test.mjs` and uses Node's built-in
 
 ## Multi-Game Direction
 
-Future games should be added as modules with clear boundaries:
+Future games should be added as game profiles or modules with clear
+boundaries:
 
 - Game state and physics
 - Agent input vector
@@ -65,8 +66,9 @@ Future games should be added as modules with clear boundaries:
 - Tests for boot, controls, scoring, and reset behavior
 
 Avoid hard-coding game-specific concepts into shared neuroevolution logic when
-adding the next game. The next substantial refactor should separate the current
-pipe runner into a game module before adding Snake or Pong.
+adding the next game. Pipe Runner and Snake now each define their own
+observation vector, action mapping, fitness function, rendering, human controls,
+and champion storage keys.
 
 ## Gameplay Notes
 
@@ -74,12 +76,19 @@ pipe runner into a game module before adding Snake or Pong.
   mutation.
 - Human play mode is intentionally one physics step per animation frame, even
   when the AI speed slider is higher. This keeps keyboard control playable.
+- Game switching resets the current run and activates only the selected game's
+  settings and explanation panel.
 - Pipe gap and pipe spacing reset the current run so one generation is not
   scored across mixed difficulty settings.
+- Snake grid size and food patience reset the current Snake run for the same
+  reason.
 - Saved pipe-runner champions are stored in `localStorage` under
-  `neuro-evolution-arcade.flappy.champion`.
-- The legacy key `ai-flappy-evolution.champion` should remain loadable while
-  older browser saves may still exist.
+  `neuro-evolution-arcade.pipe-runner.champion`.
+- The previous key `neuro-evolution-arcade.flappy.champion` and legacy key
+  `ai-flappy-evolution.champion` should remain loadable while older browser
+  saves may still exist.
+- Saved Snake champions are stored under
+  `neuro-evolution-arcade.snake.champion`.
 
 ## Before Push Checklist
 
