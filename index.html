@@ -1,0 +1,96 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>AI Flappy Evolution</title>
+    <link rel="stylesheet" href="./src/styles.css" />
+  </head>
+  <body>
+    <main class="app-shell">
+      <section class="hud">
+        <div class="brand">
+          <span class="brand-mark"></span>
+          <div>
+            <p class="eyebrow">Neuroevolution lab</p>
+            <h1>AI Flappy Evolution</h1>
+          </div>
+        </div>
+
+        <div class="metrics" aria-label="Simulation metrics">
+          <div class="metric">
+            <span>Generation</span>
+            <strong id="generation">1</strong>
+          </div>
+          <div class="metric">
+            <span>Alive</span>
+            <strong id="alive">0</strong>
+          </div>
+          <div class="metric">
+            <span>Score</span>
+            <strong id="score">0</strong>
+          </div>
+          <div class="metric">
+            <span>Best</span>
+            <strong id="bestScore">0</strong>
+          </div>
+        </div>
+      </section>
+
+      <section class="sim-grid">
+        <div class="stage-wrap">
+          <canvas id="game" width="960" height="560" aria-label="AI Flappy Bird simulation"></canvas>
+        </div>
+
+        <aside class="panel">
+          <div class="panel-section controls">
+            <button id="toggleRun" type="button">Pause</button>
+            <button id="nextGen" type="button">Next gen</button>
+            <button id="reset" type="button">Reset</button>
+          </div>
+
+          <div class="panel-section">
+            <label for="speed">Simulation speed</label>
+            <div class="range-row">
+              <input id="speed" type="range" min="1" max="12" step="1" value="3" />
+              <output id="speedValue" for="speed">3x</output>
+            </div>
+          </div>
+
+          <div class="panel-section two-col">
+            <label>
+              Population
+              <input id="population" type="number" min="12" max="180" step="4" value="60" />
+            </label>
+            <label>
+              Mutation
+              <input id="mutation" type="number" min="0" max="1" step="0.01" value="0.12" />
+            </label>
+          </div>
+
+          <div class="panel-section">
+            <div class="stat-line">
+              <span>Best fitness</span>
+              <strong id="bestFitness">0</strong>
+            </div>
+            <div class="stat-line">
+              <span>Current leader</span>
+              <strong id="leaderFitness">0</strong>
+            </div>
+            <div class="stat-line">
+              <span>Pipe distance</span>
+              <strong id="pipeDistance">0</strong>
+            </div>
+          </div>
+
+          <div class="panel-section">
+            <h2>Best neural network</h2>
+            <canvas id="network" width="320" height="230" aria-label="Best neural network visualizer"></canvas>
+          </div>
+        </aside>
+      </section>
+    </main>
+
+    <script type="module" src="./src/main.js"></script>
+  </body>
+</html>
