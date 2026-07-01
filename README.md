@@ -24,6 +24,16 @@ python3 -m http.server 5173
 
 Then open `http://localhost:5173`.
 
+## Test before push
+
+Run the full local validation suite:
+
+```bash
+npm run check
+```
+
+It checks JavaScript syntax and covers the main app flows in a simulated browser environment.
+
 ## Controls
 
 - `Pause` / `Resume`: stop or continue the simulation
