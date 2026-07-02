@@ -209,7 +209,7 @@ label {
 .game-tab {
   display: grid;
   gap: 3px;
-  min-height: 62px;
+  min-height: 54px;
   padding: 11px 14px;
   border-color: var(--fg);
   background: var(--color-surface);
@@ -230,12 +230,6 @@ label {
 
 .game-tab strong {
   font-size: 0.98rem;
-}
-
-.game-tab span {
-  color: inherit;
-  font-size: 0.82rem;
-  opacity: 0.78;
 }
 
 .stage-wrap {
@@ -270,6 +264,23 @@ label {
 .is-hidden,
 [hidden] {
   display: none;
+}
+
+#pipeSettings,
+#pongSettings,
+#lunarSettings,
+#presetPanel {
+  display: none;
+}
+
+#pipeSettings.settings-visible {
+  display: grid;
+}
+
+#pongSettings.settings-visible,
+#lunarSettings.settings-visible,
+#presetPanel.settings-visible {
+  display: block;
 }
 
 .controls {

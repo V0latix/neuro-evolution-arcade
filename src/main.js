@@ -541,20 +541,22 @@ function updateGameUi() {
   const pipeActive = activeGameKey === "pipe";
   const pongActive = activeGameKey === "pong";
   const lunarActive = activeGameKey === "lunar";
-  ui.pipeSettings.hidden = !pipeActive;
-  ui.pongSettings.hidden = !pongActive;
-  ui.lunarSettings.hidden = !lunarActive;
-  ui.presetPanel.hidden = !pipeActive;
-  ui.pipeSettings.classList.toggle("is-hidden", !pipeActive);
-  ui.pongSettings.classList.toggle("is-hidden", !pongActive);
-  ui.lunarSettings.classList.toggle("is-hidden", !lunarActive);
+  setSettingsPanel(ui.pipeSettings, pipeActive);
+  setSettingsPanel(ui.pongSettings, pongActive);
+  setSettingsPanel(ui.lunarSettings, lunarActive);
+  setSettingsPanel(ui.presetPanel, pipeActive);
   ui.explanationPipe.classList.toggle("is-hidden", activeGameKey !== "pipe");
   ui.explanationPong.classList.toggle("is-hidden", activeGameKey !== "pong");
   ui.explanationLunar.classList.toggle("is-hidden", activeGameKey !== "lunar");
   ui.preset.disabled = !pipeActive;
-  ui.presetPanel.classList.toggle("is-hidden", !pipeActive);
   updatePongSettingOutputs();
   updateLunarSettingOutputs();
+}
+
+function setSettingsPanel(element, active) {
+  element.hidden = !active;
+  element.classList.toggle("is-hidden", !active);
+  element.classList.toggle("settings-visible", active);
 }
 
 function updatePongSettingOutputs() {
@@ -1339,7 +1341,7 @@ function createLunarGame() {
   }
 
   function landingPadWidth() {
-    return clamp(numberValue(ui.lunarPadSize, 126), 80, 180);
+    return clamp(numberValue(ui.lunarPadSize, 150), 80, 190);
   }
 
   function thrustPower() {
@@ -1403,15 +1405,17 @@ function createLunarGame() {
     };
   }
 
-  function starterGenome(config) {
+  function starterGenome(config, thrustBias = 0, steeringBias = 0) {
     const genome = Array.from({ length: genomeLength(config) }, () => 0);
     const hiddenStride = config.inputs + 1;
     genome[3] = 4.2;
-    genome[config.inputs] = -0.55;
+    genome[config.inputs] = -0.55 + thrustBias;
     genome[hiddenStride + 6] = 4;
     genome[hiddenStride + 4] = -1.8;
+    genome[hiddenStride + config.inputs] = steeringBias;
     genome[hiddenStride * 2 + 6] = -4;
     genome[hiddenStride * 2 + 4] = 1.8;
+    genome[hiddenStride * 2 + config.inputs] = -steeringBias;
 
     const outputStart = config.inputs * config.hidden + config.hidden;
     const outputStride = config.hidden + 1;
@@ -1434,7 +1438,7 @@ function createLunarGame() {
       const thrust = thrustPower();
       agent.vx += Math.sin(agent.angle) * thrust;
       agent.vy -= Math.cos(agent.angle) * thrust;
-      agent.fuel = Math.max(0, agent.fuel - 0.62);
+      agent.fuel = Math.max(0, agent.fuel - 0.48);
     }
   }
 
@@ -1469,14 +1473,15 @@ function createLunarGame() {
 
     agent.fitness += 1;
     agent.fitness += Math.max(0, 1 - padDx / 430) * 2.4;
-    agent.fitness += Math.max(0, 1 - Math.abs(agent.vy) / 3.8) * 1.4;
-    agent.fitness += Math.max(0, 1 - angleAbs / 1.2) * 1.2;
+    agent.fitness += Math.max(0, 1 - speed / 4.2) * 2.1;
+    agent.fitness += Math.max(0, 1 - Math.abs(agent.vy) / 3.8) * 1.7;
+    agent.fitness += Math.max(0, 1 - angleAbs / 1.2) * 1.6;
     if (approach > 0) agent.fitness += approach * 0.08;
     if (controls.thrust) agent.fitness -= 0.16;
 
     if (agent.y + LANDER_HEIGHT / 2 >= MOON_Y) {
-      const onPad = padDx <= targetWorld.pad.width / 2 - 12;
-      const stable = Math.abs(agent.vx) < 0.72 && Math.abs(agent.vy) < 1.18 && angleAbs < 0.26;
+      const onPad = padDx <= targetWorld.pad.width / 2 - 6;
+      const stable = Math.abs(agent.vx) < 1.05 && Math.abs(agent.vy) < 1.55 && angleAbs < 0.42;
       agent.y = MOON_Y - LANDER_HEIGHT / 2;
       agent.alive = false;
       agent.landed = onPad && stable;
@@ -1486,8 +1491,9 @@ function createLunarGame() {
         agent.score = Math.max(agent.score, Math.round(220 + agent.fuel));
         agent.fitness += 9000 + agent.fuel * 18 - agent.age * 1.8;
       } else {
-        agent.fitness += onPad ? 800 : 0;
-        agent.fitness -= 1500 + padDx * 2.2 + speed * 420 + angleAbs * 850 + altitude;
+        const controlledImpact = Math.max(0, 1 - speed / 2.4) * 1000 + Math.max(0, 1 - angleAbs / 0.7) * 700;
+        agent.fitness += onPad ? 1400 + controlledImpact : 0;
+        agent.fitness -= 1100 + padDx * 1.8 + speed * 340 + angleAbs * 650 + altitude;
       }
     }
 
@@ -1597,7 +1603,7 @@ function createLunarGame() {
       return { pad: makeLandingPad() };
     },
     seedGenomes() {
-      return [starterGenome(this)];
+      return [starterGenome(this), starterGenome(this, 0.2, 0.12), starterGenome(this, -0.12, -0.12)];
     },
     makeAgent(id, genome) {
       return {
