@@ -21,6 +21,7 @@ const ui = {
   modeHuman: document.querySelector("#modeHuman"),
   gamePipe: document.querySelector("#gamePipe"),
   gamePong: document.querySelector("#gamePong"),
+  gameLunar: document.querySelector("#gameLunar"),
   activeGameTitle: document.querySelector("#activeGameTitle"),
   gameObjective: document.querySelector("#gameObjective"),
   gameHint: document.querySelector("#gameHint"),
@@ -38,6 +39,11 @@ const ui = {
   pongBallSpeedValue: document.querySelector("#pongBallSpeedValue"),
   pongPaddleSize: document.querySelector("#pongPaddleSize"),
   pongPaddleSizeValue: document.querySelector("#pongPaddleSizeValue"),
+  lunarSettings: document.querySelector("#lunarSettings"),
+  lunarGravity: document.querySelector("#lunarGravity"),
+  lunarGravityValue: document.querySelector("#lunarGravityValue"),
+  lunarFuel: document.querySelector("#lunarFuel"),
+  lunarFuelValue: document.querySelector("#lunarFuelValue"),
   presetPanel: document.querySelector("#presetPanel"),
   preset: document.querySelector("#preset"),
   saveChampion: document.querySelector("#saveChampion"),
@@ -46,6 +52,7 @@ const ui = {
   championStatus: document.querySelector("#championStatus"),
   explanationPipe: document.querySelector("#explanationPipe"),
   explanationPong: document.querySelector("#explanationPong"),
+  explanationLunar: document.querySelector("#explanationLunar"),
 };
 
 const WIDTH = 960;
@@ -61,6 +68,7 @@ const PIPE_CHAMPION_STORAGE_KEY = "neuro-evolution-arcade.pipe-runner.champion";
 const PIPE_PREVIOUS_CHAMPION_STORAGE_KEY = "neuro-evolution-arcade.flappy.champion";
 const PIPE_LEGACY_CHAMPION_STORAGE_KEY = "ai-flappy-evolution.champion";
 const PONG_CHAMPION_STORAGE_KEY = "neuro-evolution-arcade.pong.champion";
+const LUNAR_CHAMPION_STORAGE_KEY = "neuro-evolution-arcade.lunar.champion";
 const PRESETS = {
   easy: { speed: 2, mutation: 0.08, pipeGap: 190, pipeSpacing: 305 },
   normal: { speed: 3, mutation: 0.1, pipeGap: 150, pipeSpacing: 245 },
@@ -70,10 +78,12 @@ const PRESETS = {
 
 const PIPE_INPUT_LABELS = ["height", "velocity", "pipe x", "gap top", "gap bottom", "next gap"];
 const PONG_INPUT_LABELS = ["paddle y", "ball x", "ball y", "ball vx", "ball vy", "impact y", "impact dy", "time"];
+const LUNAR_INPUT_LABELS = ["x", "altitude", "vx", "vy", "angle", "fuel", "pad dx", "spin"];
 
 const games = {
   pipe: createPipeGame(),
   pong: createPongGame(),
+  lunar: createLunarGame(),
 };
 
 let activeGameKey = "pipe";
@@ -515,6 +525,7 @@ function setGame(nextGameKey) {
 function updateGameUi() {
   ui.gamePipe.classList.toggle("is-active", activeGameKey === "pipe");
   ui.gamePong.classList.toggle("is-active", activeGameKey === "pong");
+  ui.gameLunar.classList.toggle("is-active", activeGameKey === "lunar");
   ui.activeGameTitle.textContent = game.title;
   ui.gameObjective.textContent = game.objective;
   ui.gameHint.textContent = game.hint;
@@ -525,21 +536,31 @@ function updateGameUi() {
   ui.leaderFitnessLabel.textContent = game.leaderFitnessLabel;
   const pipeActive = activeGameKey === "pipe";
   const pongActive = activeGameKey === "pong";
+  const lunarActive = activeGameKey === "lunar";
   ui.pipeSettings.hidden = !pipeActive;
   ui.pongSettings.hidden = !pongActive;
+  ui.lunarSettings.hidden = !lunarActive;
   ui.presetPanel.hidden = !pipeActive;
   ui.pipeSettings.classList.toggle("is-hidden", !pipeActive);
   ui.pongSettings.classList.toggle("is-hidden", !pongActive);
+  ui.lunarSettings.classList.toggle("is-hidden", !lunarActive);
   ui.explanationPipe.classList.toggle("is-hidden", activeGameKey !== "pipe");
   ui.explanationPong.classList.toggle("is-hidden", activeGameKey !== "pong");
+  ui.explanationLunar.classList.toggle("is-hidden", activeGameKey !== "lunar");
   ui.preset.disabled = !pipeActive;
   ui.presetPanel.classList.toggle("is-hidden", !pipeActive);
   updatePongSettingOutputs();
+  updateLunarSettingOutputs();
 }
 
 function updatePongSettingOutputs() {
   ui.pongBallSpeedValue.textContent = Number(ui.pongBallSpeed.value).toFixed(1);
   ui.pongPaddleSizeValue.textContent = ui.pongPaddleSize.value;
+}
+
+function updateLunarSettingOutputs() {
+  ui.lunarGravityValue.textContent = Number(ui.lunarGravity.value).toFixed(3);
+  ui.lunarFuelValue.textContent = ui.lunarFuel.value;
 }
 
 function applyPreset(name) {
@@ -1294,6 +1315,356 @@ function createPongGame() {
   };
 }
 
+function createLunarGame() {
+  const MOON_Y = HEIGHT - GROUND;
+  const LANDER_WIDTH = 28;
+  const LANDER_HEIGHT = 32;
+  const PAD_WIDTH = 126;
+  const PAD_HEIGHT = 10;
+  const THRUST = 0.145;
+  const ROTATE_ACCEL = 0.012;
+  const MAX_ANGLE = 1.25;
+  const MAX_STEPS = 1150;
+
+  function lunarGravity() {
+    return clamp(numberValue(ui.lunarGravity, 0.07), 0.045, 0.105);
+  }
+
+  function initialFuel() {
+    return clamp(numberValue(ui.lunarFuel, 120), 70, 170);
+  }
+
+  function makeLandingPad() {
+    return {
+      x: WIDTH * (0.24 + Math.random() * 0.52),
+      width: PAD_WIDTH,
+    };
+  }
+
+  function resetLander(agent, targetWorld) {
+    const fuel = initialFuel();
+    agent.x = WIDTH * (0.34 + Math.random() * 0.32);
+    agent.y = 72 + Math.random() * 34;
+    agent.vx = Math.random() * 1.4 - 0.7;
+    agent.vy = Math.random() * 0.25;
+    agent.angle = Math.random() * 0.34 - 0.17;
+    agent.angularV = 0;
+    agent.fuel = fuel;
+    agent.initialFuel = fuel;
+    agent.alive = true;
+    agent.landed = false;
+    agent.crashed = false;
+    agent.fitness = 0;
+    agent.score = 0;
+    agent.age = 0;
+    agent.pendingThrust = false;
+    agent.pendingLeft = false;
+    agent.pendingRight = false;
+    agent.lastDistance = distanceToPad(agent, targetWorld);
+  }
+
+  function distanceToPad(agent, targetWorld) {
+    const dx = agent.x - targetWorld.pad.x;
+    const altitude = Math.max(0, MOON_Y - agent.y);
+    return Math.hypot(dx, altitude);
+  }
+
+  function inputsFor(agent, targetWorld) {
+    return [
+      (agent.x - WIDTH / 2) / (WIDTH / 2),
+      (MOON_Y - agent.y) / MOON_Y,
+      agent.vx / 4,
+      agent.vy / 4,
+      agent.angle / Math.PI,
+      agent.fuel / Math.max(1, agent.initialFuel),
+      (targetWorld.pad.x - agent.x) / WIDTH,
+      agent.angularV / 0.12,
+    ];
+  }
+
+  function chooseControls(agent, targetWorld) {
+    const outputs = feedForward(agent.genome, inputsFor(agent, targetWorld));
+    return {
+      thrust: outputs[0] > 0.55,
+      left: outputs[1] > 0.58 && outputs[1] > outputs[2] + 0.04,
+      right: outputs[2] > 0.58 && outputs[2] > outputs[1] + 0.04,
+    };
+  }
+
+  function starterGenome(config) {
+    const genome = Array.from({ length: genomeLength(config) }, () => 0);
+    const hiddenStride = config.inputs + 1;
+    genome[3] = 4.2;
+    genome[config.inputs] = -0.55;
+    genome[hiddenStride + 6] = 4;
+    genome[hiddenStride + 4] = -1.8;
+    genome[hiddenStride * 2 + 6] = -4;
+    genome[hiddenStride * 2 + 4] = 1.8;
+
+    const outputStart = config.inputs * config.hidden + config.hidden;
+    const outputStride = config.hidden + 1;
+    genome[outputStart] = 3.2;
+    genome[outputStart + config.hidden] = -0.2;
+    genome[outputStart + outputStride + 2] = 2.8;
+    genome[outputStart + outputStride + config.hidden] = -0.6;
+    genome[outputStart + outputStride * 2 + 1] = 2.8;
+    genome[outputStart + outputStride * 2 + config.hidden] = -0.6;
+    return genome;
+  }
+
+  function applyLanderControls(agent, controls) {
+    if (controls.left) agent.angularV -= ROTATE_ACCEL;
+    if (controls.right) agent.angularV += ROTATE_ACCEL;
+    agent.angularV *= 0.94;
+    agent.angle = clamp(agent.angle + agent.angularV, -MAX_ANGLE, MAX_ANGLE);
+
+    if (controls.thrust && agent.fuel > 0) {
+      agent.vx += Math.sin(agent.angle) * THRUST;
+      agent.vy -= Math.cos(agent.angle) * THRUST;
+      agent.fuel = Math.max(0, agent.fuel - 0.62);
+    }
+  }
+
+  function updateLander(agent, targetWorld, controls) {
+    if (!agent.alive) return;
+
+    const previousDistance = agent.lastDistance;
+    applyLanderControls(agent, controls);
+
+    agent.vy += lunarGravity();
+    agent.x += agent.vx;
+    agent.y += agent.vy;
+    agent.age += 1;
+
+    if (agent.x < LANDER_WIDTH / 2) {
+      agent.x = LANDER_WIDTH / 2;
+      agent.vx = Math.abs(agent.vx) * 0.35;
+    }
+    if (agent.x > WIDTH - LANDER_WIDTH / 2) {
+      agent.x = WIDTH - LANDER_WIDTH / 2;
+      agent.vx = -Math.abs(agent.vx) * 0.35;
+    }
+
+    const padDx = Math.abs(agent.x - targetWorld.pad.x);
+    const altitude = Math.max(0, MOON_Y - agent.y);
+    const speed = Math.hypot(agent.vx, agent.vy);
+    const angleAbs = Math.abs(agent.angle);
+    const distance = distanceToPad(agent, targetWorld);
+    const approach = previousDistance - distance;
+    agent.lastDistance = distance;
+    agent.score = Math.max(agent.score, Math.round(Math.max(0, 120 - padDx / 4 - speed * 15 - angleAbs * 26)));
+
+    agent.fitness += 1;
+    agent.fitness += Math.max(0, 1 - padDx / 430) * 2.4;
+    agent.fitness += Math.max(0, 1 - Math.abs(agent.vy) / 3.8) * 1.4;
+    agent.fitness += Math.max(0, 1 - angleAbs / 1.2) * 1.2;
+    if (approach > 0) agent.fitness += approach * 0.08;
+    if (controls.thrust) agent.fitness -= 0.16;
+
+    if (agent.y + LANDER_HEIGHT / 2 >= MOON_Y) {
+      const onPad = padDx <= targetWorld.pad.width / 2 - 12;
+      const stable = Math.abs(agent.vx) < 0.72 && Math.abs(agent.vy) < 1.18 && angleAbs < 0.26;
+      agent.y = MOON_Y - LANDER_HEIGHT / 2;
+      agent.alive = false;
+      agent.landed = onPad && stable;
+      agent.crashed = !agent.landed;
+
+      if (agent.landed) {
+        agent.score = Math.max(agent.score, Math.round(220 + agent.fuel));
+        agent.fitness += 9000 + agent.fuel * 18 - agent.age * 1.8;
+      } else {
+        agent.fitness += onPad ? 800 : 0;
+        agent.fitness -= 1500 + padDx * 2.2 + speed * 420 + angleAbs * 850 + altitude;
+      }
+    }
+
+    if (agent.age > MAX_STEPS) {
+      agent.alive = false;
+      agent.crashed = true;
+      agent.fitness -= 500 + distance * 1.2;
+    }
+  }
+
+  function drawLunarBackground(targetCtx, targetWorld) {
+    targetCtx.fillStyle = "#10181d";
+    targetCtx.fillRect(0, 0, WIDTH, HEIGHT);
+
+    targetCtx.fillStyle = "#f7f7f5";
+    for (const star of [
+      [92, 74, 2],
+      [214, 124, 1.5],
+      [338, 62, 1.8],
+      [612, 92, 2],
+      [812, 142, 1.6],
+      [902, 70, 1.4],
+    ]) {
+      targetCtx.beginPath();
+      targetCtx.arc(star[0], star[1], star[2], 0, Math.PI * 2);
+      targetCtx.fill();
+    }
+
+    targetCtx.fillStyle = "#d9d5c7";
+    targetCtx.fillRect(0, MOON_Y, WIDTH, GROUND);
+    targetCtx.fillStyle = "#c7c1b1";
+    for (let x = 0; x < WIDTH; x += 46) {
+      targetCtx.fillRect(x, MOON_Y + 18 + (x % 4) * 3, 28, 4);
+    }
+
+    targetCtx.fillStyle = "#1a56db";
+    targetCtx.fillRect(targetWorld.pad.x - targetWorld.pad.width / 2, MOON_Y - PAD_HEIGHT, targetWorld.pad.width, PAD_HEIGHT);
+    targetCtx.fillStyle = "#f7f7f5";
+    targetCtx.fillRect(targetWorld.pad.x - 10, MOON_Y - PAD_HEIGHT - 6, 20, 6);
+  }
+
+  function drawLander(targetCtx, agent, index) {
+    if (!agent.alive && !agent.landed && !agent.crashed) return;
+    const alpha = index === 0 || agent.landed ? 1 : 0.5;
+
+    targetCtx.save();
+    targetCtx.globalAlpha = alpha;
+    targetCtx.translate(agent.x, agent.y);
+    targetCtx.rotate(agent.angle);
+
+    targetCtx.fillStyle = agent.landed ? "#1a7a4a" : agent.crashed ? "#cc2222" : "#f7f7f5";
+    targetCtx.strokeStyle = "#0a0a0a";
+    targetCtx.lineWidth = 2;
+    targetCtx.beginPath();
+    targetCtx.moveTo(0, -LANDER_HEIGHT / 2);
+    targetCtx.lineTo(LANDER_WIDTH / 2, LANDER_HEIGHT / 2 - 4);
+    targetCtx.lineTo(-LANDER_WIDTH / 2, LANDER_HEIGHT / 2 - 4);
+    targetCtx.closePath();
+    targetCtx.fill();
+    targetCtx.stroke();
+
+    targetCtx.beginPath();
+    targetCtx.moveTo(-8, LANDER_HEIGHT / 2 - 2);
+    targetCtx.lineTo(-16, LANDER_HEIGHT / 2 + 8);
+    targetCtx.moveTo(8, LANDER_HEIGHT / 2 - 2);
+    targetCtx.lineTo(16, LANDER_HEIGHT / 2 + 8);
+    targetCtx.stroke();
+
+    if (agent.alive && agent.fuel < agent.initialFuel) {
+      targetCtx.fillStyle = "#f2c14e";
+      targetCtx.beginPath();
+      targetCtx.moveTo(-6, LANDER_HEIGHT / 2 - 2);
+      targetCtx.lineTo(0, LANDER_HEIGHT / 2 + 14);
+      targetCtx.lineTo(6, LANDER_HEIGHT / 2 - 2);
+      targetCtx.closePath();
+      targetCtx.fill();
+    }
+
+    targetCtx.restore();
+  }
+
+  return {
+    key: "lunar",
+    title: "Lunar Lander Lite",
+    objective: "Les agents apprennent a economiser leur fuel, stabiliser leur angle et se poser sur la plateforme.",
+    hint: "IA: toute la generation vole en parallele. Humain: Espace pour pousser, fleches ou A/D pour tourner.",
+    sequential: false,
+    defaultPopulation: 28,
+    defaultMutation: 0.16,
+    defaultSpeed: 7,
+    maxSpeed: 28,
+    speedLabel: "Training speed",
+    populationLabel: "Landers",
+    leaderFitnessLabel: "Current leader",
+    inputs: 8,
+    hidden: 8,
+    outputs: 3,
+    inputLabels: LUNAR_INPUT_LABELS,
+    outputLabels: ["thrust", "left", "right"],
+    outputLabel: "Burn",
+    distanceLabel: "Pad distance",
+    championStorageKey: LUNAR_CHAMPION_STORAGE_KEY,
+    championStorageKeys: [LUNAR_CHAMPION_STORAGE_KEY],
+    defaultChampionStatus: "No Lunar Lander champion saved yet.",
+    humanNetworkMessage: "Switch to AI training to view the Lunar Lander network.",
+    createWorld() {
+      return { pad: makeLandingPad() };
+    },
+    seedGenomes() {
+      return [starterGenome(this)];
+    },
+    makeAgent(id, genome) {
+      return {
+        id,
+        genome,
+        x: WIDTH / 2,
+        y: 84,
+        vx: 0,
+        vy: 0,
+        angle: 0,
+        angularV: 0,
+        fuel: initialFuel(),
+        initialFuel: initialFuel(),
+        alive: true,
+        landed: false,
+        crashed: false,
+        fitness: 0,
+        score: 0,
+        age: 0,
+        lastDistance: 0,
+        pendingThrust: false,
+        pendingLeft: false,
+        pendingRight: false,
+      };
+    },
+    makeHumanAgent(id) {
+      return this.makeAgent(id, createGenome(this));
+    },
+    resetAgents(nextAgents, targetWorld) {
+      targetWorld.pad = makeLandingPad();
+      for (const agent of nextAgents) resetLander(agent, targetWorld);
+    },
+    resetHuman(agent, targetWorld) {
+      targetWorld.pad = makeLandingPad();
+      resetLander(agent, targetWorld);
+    },
+    stepWorld() {},
+    updateAgent(agent, targetWorld) {
+      updateLander(agent, targetWorld, chooseControls(agent, targetWorld));
+    },
+    updateHuman(agent, targetWorld) {
+      if (!agent) return;
+      updateLander(agent, targetWorld, {
+        thrust: agent.pendingThrust,
+        left: agent.pendingLeft,
+        right: agent.pendingRight,
+      });
+      agent.pendingThrust = false;
+      agent.pendingLeft = false;
+      agent.pendingRight = false;
+    },
+    humanPrimaryAction(agent) {
+      agent.pendingThrust = true;
+    },
+    handleHumanKey(event, agent) {
+      if (!agent) return false;
+      if (event.code === "ArrowLeft" || event.code === "KeyA") {
+        agent.pendingLeft = true;
+        return true;
+      }
+      if (event.code === "ArrowRight" || event.code === "KeyD") {
+        agent.pendingRight = true;
+        return true;
+      }
+      return false;
+    },
+    distanceMetric(agent, targetWorld) {
+      if (!agent || !targetWorld?.pad) return 0;
+      return Math.round(distanceToPad(agent, targetWorld));
+    },
+    draw(targetCtx, targetWorld, visibleAgents, mode, currentScore) {
+      drawLunarBackground(targetCtx, targetWorld);
+      const ordered = [...visibleAgents].sort((a, b) => b.fitness - a.fitness);
+      for (const [index, agent] of ordered.slice(0, 34).entries()) drawLander(targetCtx, agent, index);
+      drawScoreBadge(targetCtx, currentScore);
+      drawCrashOverlay(targetCtx, mode, visibleAgents[0], "Press Space or Reset to fly again");
+    },
+  };
+}
+
 function drawScoreBadge(targetCtx, currentScore) {
   targetCtx.fillStyle = "rgba(255,255,255,0.82)";
   targetCtx.fillRect(18, 18, 168, 54);
@@ -1330,6 +1701,7 @@ ui.modeAi.addEventListener("click", () => setMode("ai"));
 ui.modeHuman.addEventListener("click", () => setMode("human"));
 ui.gamePipe.addEventListener("click", () => setGame("pipe"));
 ui.gamePong.addEventListener("click", () => setGame("pong"));
+ui.gameLunar.addEventListener("click", () => setGame("lunar"));
 ui.speed.addEventListener("input", () => {
   ui.speedValue.textContent = `${ui.speed.value}x`;
   if (activeGameKey === "pipe") ui.preset.value = "custom";
@@ -1348,6 +1720,10 @@ ui.pipeSpacing.addEventListener("change", () => {
 });
 for (const control of [ui.pongBallSpeed, ui.pongPaddleSize]) {
   control.addEventListener("input", updatePongSettingOutputs);
+  control.addEventListener("change", resetAll);
+}
+for (const control of [ui.lunarGravity, ui.lunarFuel]) {
+  control.addEventListener("input", updateLunarSettingOutputs);
   control.addEventListener("change", resetAll);
 }
 ui.preset.addEventListener("change", () => applyPreset(ui.preset.value));

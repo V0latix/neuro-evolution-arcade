@@ -10,6 +10,7 @@ const root = new URL("../", import.meta.url);
 const pipeChampionStorageKey = "neuro-evolution-arcade.pipe-runner.champion";
 const legacyChampionStorageKey = "ai-flappy-evolution.champion";
 const pongChampionStorageKey = "neuro-evolution-arcade.pong.champion";
+const lunarChampionStorageKey = "neuro-evolution-arcade.lunar.champion";
 const execFileAsync = promisify(execFile);
 
 class ClassList {
@@ -258,6 +259,7 @@ test("static app includes every primary control and asset reference", async () =
     "modeHuman",
     "gamePipe",
     "gamePong",
+    "gameLunar",
     "activeGameTitle",
     "gameObjective",
     "gameHint",
@@ -274,6 +276,11 @@ test("static app includes every primary control and asset reference", async () =
     "pongBallSpeedValue",
     "pongPaddleSize",
     "pongPaddleSizeValue",
+    "lunarSettings",
+    "lunarGravity",
+    "lunarGravityValue",
+    "lunarFuel",
+    "lunarFuelValue",
     "presetPanel",
     "preset",
     "leaderFitnessLabel",
@@ -286,17 +293,23 @@ test("static app includes every primary control and asset reference", async () =
 
   assert.match(html, /Comment les generations apprennent/);
   assert.match(html, /Comment Pong apprend/);
+  assert.match(html, /Comment Lunar Lander apprend/);
   assert.match(html, /Neuro Evolution Arcade/);
   assert.match(html, /Flappy Bird/);
   assert.match(html, /Pong/);
+  assert.match(html, /Lunar Lander/);
   assert.doesNotMatch(html, /Snake/);
   assert.doesNotMatch(script, /createSnakeGame|gameSnake|SNAKE_INPUT_LABELS/);
   assert.match(script, /inputs: 6/);
   assert.match(script, /inputs: 8/);
   assert.match(script, /PONG_INPUT_LABELS/);
+  assert.match(script, /LUNAR_INPUT_LABELS/);
+  assert.match(script, /createLunarGame/);
   assert.match(script, /outputLabels: \["up", "stay", "down"\]/);
+  assert.match(script, /outputLabels: \["thrust", "left", "right"\]/);
   assert.match(script, /next gap/);
   assert.match(script, /impact dy/);
+  assert.match(script, /pad dx/);
   assert.match(script, /trackingGenome/);
 });
 
@@ -313,6 +326,8 @@ test("module boots, draws AI network labels, and reports initial training state"
   assert.equal(element(harness, "activeGameTitle").textContent, "Flappy Bird");
   assert.equal(element(harness, "pongSettings").classList.contains("is-hidden"), true);
   assert.equal(element(harness, "pongSettings").hidden, true);
+  assert.equal(element(harness, "lunarSettings").classList.contains("is-hidden"), true);
+  assert.equal(element(harness, "lunarSettings").hidden, true);
   assert.equal(element(harness, "nextGen").disabled, false);
 
   const networkCalls = element(harness, "network").getContext().calls;
@@ -368,6 +383,36 @@ test("game picker switches to Pong with sequential rally controls and network sh
   assert.equal(labels.includes("up"), true);
   assert.equal(labels.includes("stay"), true);
   assert.equal(labels.includes("down"), true);
+});
+
+test("game picker switches to Lunar Lander with dedicated sliders and network shape", async () => {
+  const harness = await loadHarness();
+
+  element(harness, "gameLunar").click();
+  harness.runFrame();
+
+  assert.equal(element(harness, "activeGameTitle").textContent, "Lunar Lander Lite");
+  assert.equal(element(harness, "gameLunar").classList.contains("is-active"), true);
+  assert.equal(element(harness, "pipeSettings").hidden, true);
+  assert.equal(element(harness, "pongSettings").hidden, true);
+  assert.equal(element(harness, "lunarSettings").hidden, false);
+  assert.equal(element(harness, "presetPanel").hidden, true);
+  assert.equal(element(harness, "aliveLabel").textContent, "Alive");
+  assert.equal(element(harness, "speedLabel").textContent, "Training speed");
+  assert.equal(element(harness, "population").value, 28);
+  assert.equal(element(harness, "mutation").value, "0.16");
+  assert.equal(element(harness, "distanceLabel").textContent, "Pad distance");
+  assert.equal(element(harness, "speed").value, 7);
+  assert.equal(element(harness, "speed").max, 28);
+  assert.equal(element(harness, "lunarGravityValue").textContent, "0.070");
+  assert.equal(element(harness, "lunarFuelValue").textContent, "120");
+
+  const networkCalls = element(harness, "network").getContext().calls;
+  const labels = networkCalls.filter((call) => call.type === "fillText").map((call) => call.text);
+  assert.deepEqual(labels.slice(0, 8), ["x", "altitude", "vx", "vy", "angle", "fuel", "pad dx", "spin"]);
+  assert.equal(labels.includes("thrust"), true);
+  assert.equal(labels.includes("left"), true);
+  assert.equal(labels.includes("right"), true);
 });
 
 test("training controls evolve generations and difficulty presets update numeric settings", async () => {
@@ -444,6 +489,36 @@ test("Pong human mode uses arrow keys and keeps AI-only actions disabled", async
   assert.equal(element(harness, "activeGameTitle").textContent, "Pong");
 });
 
+test("Lunar human mode uses thrust and rotation controls", async () => {
+  const harness = await loadHarness();
+
+  element(harness, "gameLunar").click();
+  element(harness, "modeHuman").click();
+  harness.runFrame();
+
+  assert.equal(element(harness, "generation").textContent, "Human");
+  assert.equal(element(harness, "alive").textContent, 1);
+  assert.equal(element(harness, "nextGen").disabled, true);
+
+  let prevented = false;
+  harness.window.dispatchEvent({
+    type: "keydown",
+    code: "ArrowRight",
+    preventDefault() {
+      prevented = true;
+    },
+  });
+  harness.window.dispatchEvent({
+    type: "keydown",
+    code: "Space",
+    preventDefault() {},
+  });
+  harness.runFrame(2);
+
+  assert.equal(prevented, true);
+  assert.equal(element(harness, "activeGameTitle").textContent, "Lunar Lander Lite");
+});
+
 test("seeded Pong model can score multiple returns in AI mode", async () => {
   const originalRandom = Math.random;
   Math.random = () => 0.5;
@@ -503,6 +578,26 @@ test("Pong champions are saved under the Pong key with compatible genome length"
   assert.match(element(harness, "championStatus").textContent, /Pong champion loaded/);
 });
 
+test("Lunar champions are saved under the Lunar key with compatible genome length", async () => {
+  const harness = await loadHarness();
+
+  element(harness, "gameLunar").click();
+  harness.runFrame();
+
+  element(harness, "saveChampion").click();
+  const saved = JSON.parse(harness.storage.getItem(lunarChampionStorageKey));
+
+  assert.equal(saved.game, "lunar");
+  assert.equal(saved.genome.length, 99);
+  assert.equal(saved.inputs, 8);
+  assert.equal(saved.hidden, 8);
+  assert.equal(saved.outputs, 3);
+
+  element(harness, "loadChampion").click();
+  harness.runFrame();
+  assert.match(element(harness, "championStatus").textContent, /Lunar Lander Lite champion loaded/);
+});
+
 test("legacy champion storage key remains loadable after project rename", async () => {
   const harness = await loadHarness();
   harness.runFrame();
@@ -555,6 +650,29 @@ test("Pong-specific sliders reset Pong without affecting pipe settings", async (
   assert.equal(element(harness, "generation").textContent, 1);
   assert.match(String(element(harness, "alive").textContent), /^[1-9]\/36$/);
   assert.equal(element(harness, "pipeGap").value, "150");
+});
+
+test("Lunar-specific sliders reset Lunar without exposing other game settings", async () => {
+  const harness = await loadHarness();
+
+  element(harness, "gameLunar").click();
+  harness.runFrame();
+  element(harness, "nextGen").click();
+  harness.runFrame();
+  assert.equal(element(harness, "generation").textContent, 2);
+
+  element(harness, "lunarGravity").value = "0.085";
+  element(harness, "lunarGravity").dispatchEvent({ type: "input" });
+  assert.equal(element(harness, "lunarGravityValue").textContent, "0.085");
+  element(harness, "lunarGravity").dispatchEvent({ type: "change" });
+  harness.runFrame();
+
+  assert.equal(element(harness, "generation").textContent, 1);
+  assert.equal(element(harness, "lunarSettings").hidden, false);
+  assert.equal(element(harness, "pipeSettings").hidden, true);
+  assert.equal(element(harness, "pongSettings").hidden, true);
+  assert.equal(element(harness, "pipeGap").value, "150");
+  assert.equal(element(harness, "pongBallSpeed").value, "4.8");
 });
 
 test("source files pass Node syntax checks", async () => {

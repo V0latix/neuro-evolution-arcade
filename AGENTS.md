@@ -4,8 +4,8 @@
 
 Neuro Evolution Arcade is a static browser app for training neural-network
 agents on small arcade games through neuroevolution. It currently includes
-Flappy Bird and Pong, and the codebase should continue evolving as a multi-game
-lab.
+Flappy Bird, Pong, and Lunar Lander Lite, and the codebase should continue
+evolving as a multi-game lab.
 
 The app has no build step and no runtime dependencies. It is served directly
 from `index.html`, `src/main.js`, and `src/styles.css`.
@@ -66,7 +66,7 @@ boundaries:
 - Tests for boot, controls, scoring, and reset behavior
 
 Avoid hard-coding game-specific concepts into shared neuroevolution logic when
-adding the next game. Flappy Bird and Pong now each define their own
+adding the next game. Flappy Bird, Pong, and Lunar Lander Lite each define their own
 observation vector, action mapping, fitness function, rendering, human controls,
 and champion storage keys.
 
@@ -93,6 +93,13 @@ and champion storage keys.
 - Pong ball speed and paddle size reset the current Pong run for the same
   reason. Do not add a total rally duration cap; it artificially limits the
   best score when the horizontal ball speed is constant.
+- Lunar Lander Lite uses a dedicated settings panel for gravity and initial
+  fuel. These controls must be hidden for Flappy Bird and Pong, and changing
+  them should reset Lunar training.
+- Lunar Lander Lite has eight inputs (`x`, `altitude`, `vx`, `vy`, `angle`,
+  `fuel`, `pad dx`, `spin`) and three outputs (`thrust`, `left`, `right`).
+  Keep its physics, fitness shaping, slider tests, and champion compatibility
+  tests in sync.
 - Saved Flappy Bird champions are stored in `localStorage` under the historical
   `neuro-evolution-arcade.pipe-runner.champion`.
 - The previous key `neuro-evolution-arcade.flappy.champion` and legacy key
@@ -100,6 +107,8 @@ and champion storage keys.
   saves may still exist.
 - Saved Pong champions are stored under
   `neuro-evolution-arcade.pong.champion`.
+- Saved Lunar Lander champions are stored under
+  `neuro-evolution-arcade.lunar.champion`.
 
 ## Before Push Checklist
 

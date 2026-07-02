@@ -48,6 +48,10 @@
               <strong>Pong</strong>
               <span>Paddle, balle, rally</span>
             </button>
+            <button id="gameLunar" class="game-tab" type="button">
+              <strong>Lunar Lander</strong>
+              <span>Fuel, angle, touchdown</span>
+            </button>
           </section>
 
           <div class="stage-wrap">
@@ -124,6 +128,25 @@
               comparer les specimens sur les memes conditions.
             </p>
           </section>
+
+          <section id="explanationLunar" class="panel-section explanation is-hidden">
+            <h2>Comment Lunar Lander apprend</h2>
+            <p>
+              Chaque lander doit se poser sur une plateforme avec une vitesse faible et un angle
+              stable. Le reseau observe sa position, son altitude, ses vitesses, son angle, son fuel
+              restant et sa distance horizontale avec la plateforme.
+            </p>
+            <p>
+              Les sorties du reseau sont trois commandes : moteur principal, rotation gauche et
+              rotation droite. Un bon specimen ne doit pas seulement survivre : il doit economiser
+              son fuel, corriger son angle, ralentir sa chute et viser la zone d'atterrissage.
+            </p>
+            <p>
+              La fitness recompense l'approche de la plateforme, une descente controlee et les
+              atterrissages propres. Elle penalise les crashs rapides, l'angle trop fort, la vitesse
+              trop elevee et le fuel gaspille.
+            </p>
+          </section>
         </div>
 
         <aside class="panel">
@@ -178,6 +201,19 @@
             <div class="range-row">
               <input id="pongPaddleSize" type="range" min="62" max="122" step="4" value="96" />
               <output id="pongPaddleSizeValue" for="pongPaddleSize">96</output>
+            </div>
+          </div>
+
+          <div id="lunarSettings" class="panel-section is-hidden">
+            <label for="lunarGravity">Gravite</label>
+            <div class="range-row">
+              <input id="lunarGravity" type="range" min="0.045" max="0.105" step="0.005" value="0.070" />
+              <output id="lunarGravityValue" for="lunarGravity">0.070</output>
+            </div>
+            <label for="lunarFuel">Fuel initial</label>
+            <div class="range-row">
+              <input id="lunarFuel" type="range" min="70" max="170" step="10" value="120" />
+              <output id="lunarFuelValue" for="lunarFuel">120</output>
             </div>
           </div>
 

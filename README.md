@@ -3,16 +3,17 @@
 Neuro Evolution Arcade is a browser playground for training small neural
 networks to play arcade-style games through neuroevolution.
 
-The first available game is Flappy Bird. Pong is now available as a second
-game. The long-term direction is to add more games that reuse the same learning
-loop: observe game state, decide an action, score fitness, select the strongest
-agents, cross over their networks, mutate weights, and run a new generation.
+The first available game is Flappy Bird. Pong and Lunar Lander Lite are also
+available. The long-term direction is to add more games that reuse the same
+learning loop: observe game state, decide an action, score fitness, select the
+strongest agents, cross over their networks, mutate weights, and run a new
+generation.
 
 ## Current Games
 
 The app currently runs entirely in the browser and includes:
 
-- Canvas-based Flappy Bird and Pong simulations
+- Canvas-based Flappy Bird, Pong, and Lunar Lander Lite simulations
 - A game picker that separates game-specific controls and explanations
 - Populations of neural-network-controlled agents
 - Fitness scoring, elite preservation, crossover, and mutation
@@ -23,10 +24,14 @@ The app currently runs entirely in the browser and includes:
   three action outputs: up, stay, and down
 - Sequential Pong evaluation: one specimen plays a full rally, then the next
   specimen starts its own rally
-- Human play mode with the space bar for Flappy Bird and arrows/WASD for Pong
+- Lunar Lander Lite with eight inputs for position, velocity, angle, fuel, pad
+  distance, and spin, plus thrust/left/right outputs
+- Human play mode with the space bar for Flappy Bird, arrows/WASD for Pong, and
+  space plus arrows/A/D for Lunar Lander
 - Local champion save/load via browser storage
 - Flappy Bird difficulty presets for gap, spacing, speed, and mutation
 - Pong-specific sliders for ball speed and paddle size
+- Lunar-specific sliders for gravity and initial fuel
 
 ## Game Modules
 
@@ -46,15 +51,21 @@ signal. Evolution has to discover that stronger behavior through selection and
 mutation. Each return also increases the challenge by varying the trajectory,
 speeding up the ball, and shrinking the active paddle.
 
+`Lunar Lander Lite` trains agents to land a small craft on a platform. The
+network observes horizontal position, altitude, horizontal and vertical speed,
+angle, fuel, distance to the landing pad, and spin. Its outputs control main
+thrust, rotation left, and rotation right. The fitness function rewards moving
+toward the pad, slowing descent, staying upright, saving fuel, and completing a
+soft landing. It penalizes hard impacts, missed platforms, high speed, and
+tilted crashes.
+
 ## Next Game Ideas
 
-Strong candidates for future modules after Pong:
+Strong candidates for future modules after Lunar:
 
-- `Breakout`: adds planning through brick layouts, ball angle, and survival.
 - `Dino Runner`: close to the Flappy flow, but with jump timing and obstacle
   type recognition.
-- `Lunar Lander Lite`: more advanced continuous control with fuel, velocity,
-  rotation, and landing fitness.
+- `Car Avoider`: lane changes, obstacle timing, and bonus/risk tradeoffs.
 - `2048`: useful for testing strategy and delayed reward, though better suited
   to tree search or reinforcement learning hybrids.
 - `Tetris Mini`: interesting but harder; requires board evaluation, rotation,
@@ -63,9 +74,10 @@ Strong candidates for future modules after Pong:
 Recommended order:
 
 1. `Dino Runner`, because it reuses much of the current side-scroller logic.
-2. `Breakout`, because it extends Pong-style paddle control with richer level
-   state.
-3. `Lunar Lander Lite`, because it pushes toward continuous control.
+2. `Car Avoider`, because it introduces multiple simultaneous choices without
+   becoming too hard to visualize.
+3. `Grid Collector`, because it can show path planning, reward tradeoffs, and
+   local traps clearly.
 
 ## Run Locally
 
@@ -104,6 +116,8 @@ environment.
 - `Taille paddle`: change Pong paddle height
 - `Training speed`: in Pong, run more simulation steps per animation frame while
   still testing one specimen at a time
+- `Gravite`: change Lunar Lander gravity and restart Lunar training
+- `Fuel initial`: change Lunar Lander starting fuel and restart Lunar training
 - `Save` / `Load` / `Clear`: manage the best saved champion in local browser
   storage
 - `Preset difficulte`: apply easy, normal, hard, or chaos training settings
