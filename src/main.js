@@ -71,7 +71,7 @@ const PRESETS = {
 };
 
 const PIPE_INPUT_LABELS = ["height", "velocity", "pipe x", "gap top", "gap bottom", "next gap"];
-const PONG_INPUT_LABELS = ["paddle y", "ball x", "ball y", "ball vx", "ball vy", "target dy", "impact dy", "incoming"];
+const PONG_INPUT_LABELS = ["paddle y", "ball x", "ball y", "ball vx", "ball vy", "impact y", "impact dy", "time"];
 
 const games = {
   pipe: createPipeGame(),
@@ -177,6 +177,11 @@ function setupPopulation(size = Number(ui.population.value)) {
   agents = Array.from({ length: size }, () => makeAgent());
   if (bestGenome && agents.length > 0) {
     agents[0] = makeAgent(cloneGenome(bestGenome));
+  } else if (game.seedGenomes) {
+    const seeds = game.seedGenomes();
+    for (let i = 0; i < seeds.length && i < agents.length; i += 1) {
+      agents[i] = makeAgent(cloneGenome(seeds[i]));
+    }
   }
   game.resetAgents(agents, world);
   startSequentialAgent();
@@ -501,6 +506,8 @@ function setGame(nextGameKey) {
   ui.speed.max = game.maxSpeed;
   ui.speed.value = game.defaultSpeed;
   ui.speedValue.textContent = `${ui.speed.value}x`;
+  ui.population.value = game.defaultPopulation;
+  ui.mutation.value = game.defaultMutation.toFixed(2);
   updateGameUi();
   updateModeButtons();
   restartTraining(true);
@@ -518,12 +525,17 @@ function updateGameUi() {
   ui.populationLabel.textContent = game.populationLabel;
   ui.distanceLabel.textContent = game.distanceLabel;
   ui.leaderFitnessLabel.textContent = game.leaderFitnessLabel;
-  ui.pipeSettings.classList.toggle("is-hidden", activeGameKey !== "pipe");
-  ui.pongSettings.classList.toggle("is-hidden", activeGameKey !== "pong");
+  const pipeActive = activeGameKey === "pipe";
+  const pongActive = activeGameKey === "pong";
+  ui.pipeSettings.hidden = !pipeActive;
+  ui.pongSettings.hidden = !pongActive;
+  ui.presetPanel.hidden = !pipeActive;
+  ui.pipeSettings.classList.toggle("is-hidden", !pipeActive);
+  ui.pongSettings.classList.toggle("is-hidden", !pongActive);
   ui.explanationPipe.classList.toggle("is-hidden", activeGameKey !== "pipe");
   ui.explanationPong.classList.toggle("is-hidden", activeGameKey !== "pong");
-  ui.preset.disabled = activeGameKey !== "pipe";
-  ui.presetPanel.classList.toggle("is-hidden", activeGameKey !== "pipe");
+  ui.preset.disabled = !pipeActive;
+  ui.presetPanel.classList.toggle("is-hidden", !pipeActive);
   updatePongSettingOutputs();
 }
 
@@ -828,6 +840,8 @@ function createPipeGame() {
     objective: "Les agents apprennent a passer entre deux tuyaux en anticipant le passage actuel et le suivant.",
     hint: "IA: evolution automatique. Humain: Espace pour battre des ailes.",
     sequential: false,
+    defaultPopulation: 10,
+    defaultMutation: 0.1,
     defaultSpeed: 3,
     maxSpeed: 12,
     speedLabel: "Simulation speed",
@@ -988,6 +1002,33 @@ function createPongGame() {
     return reflectY(agent.ballY + agent.ballVy * framesToPaddle);
   }
 
+  function framesToImpact(agent) {
+    if (agent.ballVx >= -0.01) return 1;
+    const targetX = PADDLE_X + PADDLE_WIDTH + BALL_RADIUS;
+    return clamp((agent.ballX - targetX) / Math.abs(agent.ballVx) / 160, 0, 1);
+  }
+
+  function targetFromOutput(output) {
+    const { top, bottom } = verticalBounds();
+    return top + clamp(output, 0, 1) * (bottom - top);
+  }
+
+  function actionTowardTarget(agent, targetY) {
+    const center = agent.paddleY + paddleHeight() / 2;
+    if (targetY < center - 6) return 0;
+    if (targetY > center + 6) return 2;
+    return 1;
+  }
+
+  function trackingGenome(config) {
+    const genome = Array.from({ length: genomeLength(config) }, () => 0);
+    genome[5] = 4.6;
+    genome[config.inputs * config.hidden] = -2.3;
+    const outputStart = config.inputs * config.hidden + config.hidden;
+    genome[outputStart] = 4.2;
+    return genome;
+  }
+
   function resetPong(agent) {
     const height = paddleHeight();
     const speed = ballSpeed();
@@ -1014,15 +1055,19 @@ function createPongGame() {
       agent.ballY / HEIGHT,
       agent.ballVx / 10,
       agent.ballVy / 10,
-      (agent.ballY - paddleCenter) / HEIGHT,
+      impactY / HEIGHT,
       (impactY - paddleCenter) / HEIGHT,
-      agent.ballVx < 0 ? 1 : 0,
+      framesToImpact(agent),
     ];
   }
 
-  function chooseAction(agent) {
+  function chooseDecision(agent) {
     const outputs = feedForward(agent.genome, inputsFor(agent));
-    return outputs.indexOf(Math.max(...outputs));
+    const targetY = targetFromOutput(outputs[0]);
+    return {
+      targetY,
+      action: actionTowardTarget(agent, targetY),
+    };
   }
 
   function applyPaddleAction(agent, action) {
@@ -1032,7 +1077,7 @@ function createPongGame() {
     agent.paddleY = clamp(agent.paddleY, TOP_WALL, BOTTOM_WALL - height);
   }
 
-  function updatePong(agent, action) {
+  function updatePong(agent, decision) {
     if (!agent.alive) return;
 
     const height = paddleHeight();
@@ -1040,7 +1085,10 @@ function createPongGame() {
     const beforeImpact = predictedImpactY(agent);
     const beforeImpactDistance = Math.abs(beforeImpact - beforeCenter);
     const incoming = agent.ballVx < 0;
-    const desiredAction = beforeImpact < beforeCenter - 8 ? 0 : beforeImpact > beforeCenter + 8 ? 2 : 1;
+    const action = typeof decision === "number" ? decision : decision?.action ?? 1;
+    const targetY = typeof decision === "number" ? beforeImpact : decision?.targetY ?? beforeImpact;
+    const desiredAction = actionTowardTarget(agent, beforeImpact);
+    const targetError = Math.abs(targetY - beforeImpact);
 
     applyPaddleAction(agent, action);
     agent.ballX += agent.ballVx;
@@ -1068,6 +1116,7 @@ function createPongGame() {
 
     if (incoming) {
       agent.fitness += Math.max(0, 1 - impactDistance / (height * 1.7)) * 10;
+      agent.fitness += Math.max(0, 1 - targetError / HEIGHT) * 8;
       agent.fitness += action === desiredAction ? 5 : -3.5;
       if (impactDistance < beforeImpactDistance) agent.fitness += 4;
       else agent.fitness -= 1.5;
@@ -1154,6 +1203,8 @@ function createPongGame() {
     objective: "Les agents apprennent a placer le paddle pour renvoyer la balle le plus longtemps possible.",
     hint: "IA: un specimen joue un rally complet, puis le suivant est teste. Humain: fleches ou WASD.",
     sequential: true,
+    defaultPopulation: 36,
+    defaultMutation: 0.14,
     defaultSpeed: 14,
     maxSpeed: 55,
     speedLabel: "Training speed",
@@ -1161,10 +1212,10 @@ function createPongGame() {
     leaderFitnessLabel: "Current specimen",
     inputs: 8,
     hidden: 9,
-    outputs: 3,
+    outputs: 1,
     inputLabels: PONG_INPUT_LABELS,
-    outputLabels: ["up", "stay", "down"],
-    outputLabel: "Paddle",
+    outputLabels: ["target"],
+    outputLabel: "Target",
     distanceLabel: "Ball distance",
     championStorageKey: PONG_CHAMPION_STORAGE_KEY,
     championStorageKeys: [PONG_CHAMPION_STORAGE_KEY],
@@ -1172,6 +1223,9 @@ function createPongGame() {
     humanNetworkMessage: "Switch to AI training to view the Pong network.",
     createWorld() {
       return { activeAgentIndex: 0 };
+    },
+    seedGenomes() {
+      return [trackingGenome(this)];
     },
     makeAgent(id, genome) {
       return {
@@ -1210,7 +1264,7 @@ function createPongGame() {
     },
     stepWorld() {},
     updateAgent(agent) {
-      updatePong(agent, chooseAction(agent));
+      updatePong(agent, chooseDecision(agent));
     },
     updateHuman(agent) {
       if (!agent) return;

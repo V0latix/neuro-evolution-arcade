@@ -83,9 +83,10 @@ and champion storage keys.
 - Pong's right-side controls differ from Flappy Bird: pipe presets are hidden,
   Pong tuning sliders are shown, and the metric label changes to the current
   specimen.
-- Pong learning depends on the predicted impact signal. If changing the Pong
-  physics, keep `PONG_INPUT_LABELS`, `predictedImpactY`, the fitness shaping,
-  and champion compatibility tests in sync.
+- Pong learning depends on the predicted impact signal and a seeded tracking
+  genome. If changing the Pong physics, keep `PONG_INPUT_LABELS`,
+  `predictedImpactY`, `trackingGenome`, the fitness shaping, and champion
+  compatibility tests in sync.
 - Pipe gap and pipe spacing reset the current run so one generation is not
   scored across mixed difficulty settings.
 - Pong ball speed, paddle size, and rally duration reset the current Pong run

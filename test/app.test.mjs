@@ -296,9 +296,10 @@ test("static app includes every primary control and asset reference", async () =
   assert.match(script, /inputs: 6/);
   assert.match(script, /inputs: 8/);
   assert.match(script, /PONG_INPUT_LABELS/);
-  assert.match(script, /outputLabels: \["up", "stay", "down"\]/);
+  assert.match(script, /outputLabels: \["target"\]/);
   assert.match(script, /next gap/);
   assert.match(script, /impact dy/);
+  assert.match(script, /trackingGenome/);
 });
 
 test("module boots, draws AI network labels, and reports initial training state", async () => {
@@ -313,6 +314,7 @@ test("module boots, draws AI network labels, and reports initial training state"
   assert.equal(element(harness, "gamePipe").classList.contains("is-active"), true);
   assert.equal(element(harness, "activeGameTitle").textContent, "Flappy Bird");
   assert.equal(element(harness, "pongSettings").classList.contains("is-hidden"), true);
+  assert.equal(element(harness, "pongSettings").hidden, true);
   assert.equal(element(harness, "nextGen").disabled, false);
 
   const networkCalls = element(harness, "network").getContext().calls;
@@ -337,17 +339,22 @@ test("game picker switches to Pong with sequential rally controls and network sh
   assert.equal(element(harness, "activeGameTitle").textContent, "Pong");
   assert.equal(element(harness, "gamePong").classList.contains("is-active"), true);
   assert.equal(element(harness, "pipeSettings").classList.contains("is-hidden"), true);
+  assert.equal(element(harness, "pipeSettings").hidden, true);
   assert.equal(element(harness, "pongSettings").classList.contains("is-hidden"), false);
+  assert.equal(element(harness, "pongSettings").hidden, false);
   assert.equal(element(harness, "presetPanel").classList.contains("is-hidden"), true);
+  assert.equal(element(harness, "presetPanel").hidden, true);
   assert.equal(element(harness, "aliveLabel").textContent, "Specimen");
   assert.equal(element(harness, "speedLabel").textContent, "Training speed");
+  assert.equal(element(harness, "population").value, 36);
+  assert.equal(element(harness, "mutation").value, "0.14");
   assert.equal(element(harness, "distanceLabel").textContent, "Ball distance");
   assert.equal(element(harness, "speed").value, 14);
   assert.equal(element(harness, "speed").max, 55);
   assert.equal(element(harness, "pongBallSpeedValue").textContent, "4.8");
   assert.equal(element(harness, "pongPaddleSizeValue").textContent, "96");
   assert.equal(element(harness, "pongRallyLengthValue").textContent, "1800");
-  assert.match(String(element(harness, "alive").textContent), /^[1-9]\/10$/);
+  assert.match(String(element(harness, "alive").textContent), /^[1-9]\/36$/);
 
   const networkCalls = element(harness, "network").getContext().calls;
   const labels = networkCalls.filter((call) => call.type === "fillText").map((call) => call.text);
@@ -357,13 +364,11 @@ test("game picker switches to Pong with sequential rally controls and network sh
     "ball y",
     "ball vx",
     "ball vy",
-    "target dy",
+    "impact y",
     "impact dy",
-    "incoming",
+    "time",
   ]);
-  assert.equal(labels.includes("up"), true);
-  assert.equal(labels.includes("stay"), true);
-  assert.equal(labels.includes("down"), true);
+  assert.equal(labels.includes("target"), true);
 });
 
 test("training controls evolve generations and difficulty presets update numeric settings", async () => {
@@ -440,6 +445,22 @@ test("Pong human mode uses arrow keys and keeps AI-only actions disabled", async
   assert.equal(element(harness, "activeGameTitle").textContent, "Pong");
 });
 
+test("seeded Pong model returns the first ball in AI mode", async () => {
+  const originalRandom = Math.random;
+  Math.random = () => 0.5;
+
+  try {
+    const harness = await loadHarness();
+    element(harness, "gamePong").click();
+    harness.runFrame(30);
+
+    assert.ok(Number(element(harness, "score").textContent) >= 1);
+    assert.ok(Number(element(harness, "leaderFitness").textContent) > 1000);
+  } finally {
+    Math.random = originalRandom;
+  }
+});
+
 test("champion save, load, clear, and incompatible payload handling work", async () => {
   const harness = await loadHarness();
   harness.runFrame();
@@ -473,10 +494,10 @@ test("Pong champions are saved under the Pong key with compatible genome length"
   const saved = JSON.parse(harness.storage.getItem(pongChampionStorageKey));
 
   assert.equal(saved.game, "pong");
-  assert.equal(saved.genome.length, 111);
+  assert.equal(saved.genome.length, 91);
   assert.equal(saved.inputs, 8);
   assert.equal(saved.hidden, 9);
-  assert.equal(saved.outputs, 3);
+  assert.equal(saved.outputs, 1);
 
   element(harness, "loadChampion").click();
   harness.runFrame();
@@ -533,7 +554,7 @@ test("Pong-specific sliders reset Pong without affecting pipe settings", async (
   harness.runFrame();
 
   assert.equal(element(harness, "generation").textContent, 1);
-  assert.match(String(element(harness, "alive").textContent), /^[1-9]\/10$/);
+  assert.match(String(element(harness, "alive").textContent), /^[1-9]\/36$/);
   assert.equal(element(harness, "pipeGap").value, "150");
 });
 
