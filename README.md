@@ -3,34 +3,28 @@
 Neuro Evolution Arcade is a browser playground for training small neural
 networks to play arcade-style games through neuroevolution.
 
-The first available game is Flappy Bird. Pong and Lunar Lander Lite are also
-available. The long-term direction is to add more games that reuse the same
-learning loop: observe game state, decide an action, score fitness, select the
-strongest agents, cross over their networks, mutate weights, and run a new
-generation.
+The current games are Flappy Bird and Lunar Lander Lite. The long-term
+direction is to add more games that reuse the same learning loop: observe game
+state, decide an action, score fitness, select the strongest agents, cross over
+their networks, mutate weights, and run a new generation.
 
 ## Current Games
 
 The app currently runs entirely in the browser and includes:
 
-- Canvas-based Flappy Bird, Pong, and Lunar Lander Lite simulations
+- Canvas-based Flappy Bird and Lunar Lander Lite simulations
 - A game picker that separates game-specific controls and explanations
 - Populations of neural-network-controlled agents
 - Fitness scoring, elite preservation, crossover, and mutation
 - Generation-by-generation training
 - Live metrics and a neural-network visualizer for the current champion
 - Flappy Bird with six inputs, including the following pipe gap
-- Pong with eight inputs, including predicted impact position and distance, and
-  three action outputs: up, stay, and down
-- Sequential Pong evaluation: one specimen plays a full rally, then the next
-  specimen starts its own rally
 - Lunar Lander Lite with eight inputs for position, velocity, angle, fuel, pad
   distance, and spin, plus thrust/left/right outputs
-- Human play mode with the space bar for Flappy Bird, arrows/WASD for Pong, and
-  space plus arrows/A/D for Lunar Lander
+- Human play mode with the space bar for Flappy Bird and space plus arrows/A/D
+  for Lunar Lander
 - Local champion save/load via browser storage
 - Flappy Bird difficulty presets for gap, spacing, speed, and mutation
-- Pong-specific sliders for ball speed and paddle size
 - Lunar-specific sliders for gravity, initial fuel, platform size, and engine
   power
 
@@ -40,25 +34,15 @@ The app currently runs entirely in the browser and includes:
 velocity, obstacle distance, the current gap, and the next gap. The output is a
 single flap decision.
 
-`Pong` trains paddle agents. The network observes the paddle position, ball
-position, ball velocity, vertical distance from the current ball, predicted
-impact position at the paddle line, impact distance, and time to impact. The
-network chooses one of three discrete actions: move up, stay, or move down.
-Pong is a strong fit for this app because the reward is immediate and visual:
-choose the right direction, align with the predicted trajectory, return the
-ball, repeat. Pong starts with a deliberately imperfect ball-following genome:
-it can sometimes survive, but it does not directly use the predicted impact
-signal. Evolution has to discover that stronger behavior through selection and
-mutation. Each return also increases the challenge by varying the trajectory,
-speeding up the ball, and shrinking the active paddle.
-
 `Lunar Lander Lite` trains agents to land a small craft on a platform. The
 network observes horizontal position, altitude, horizontal and vertical speed,
 angle, fuel, distance to the landing pad, and spin. Its outputs control main
-thrust, rotation left, and rotation right. The fitness function rewards moving
-toward the pad, slowing descent, staying upright, saving fuel, and completing a
-soft landing. It penalizes hard impacts, missed platforms, high speed, and
-tilted crashes.
+thrust, rotation left, and rotation right. Each specimen can replay up to five
+attempts inside the same generation, stopping early when it lands successfully.
+The visible score is the total number of successful landings in the generation.
+Fitness is cumulative across all attempts, so a specimen is selected for both
+landing success and useful partial behavior: moving toward the pad, slowing
+descent, staying upright, and saving fuel.
 
 ## Next Game Ideas
 
@@ -113,11 +97,6 @@ environment.
 - `Espacement tuyaux`: change the horizontal distance between consecutive pipes
   These pipe controls are only visible for Flappy Bird.
 - `Human play`: switch to manual play, then press `Space` to flap
-- `Pong`: use arrows or WASD in human mode
-- `Vitesse balle`: change Pong ball speed
-- `Taille paddle`: change Pong paddle height
-- `Training speed`: in Pong, run more simulation steps per animation frame while
-  still testing one specimen at a time
 - `Gravite`: change Lunar Lander gravity and restart Lunar training
 - `Fuel initial`: change Lunar Lander starting fuel and restart Lunar training
 - `Taille plateforme`: change the Lunar landing platform width

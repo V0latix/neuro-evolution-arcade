@@ -20,7 +20,6 @@ const ui = {
   modeAi: document.querySelector("#modeAi"),
   modeHuman: document.querySelector("#modeHuman"),
   gamePipe: document.querySelector("#gamePipe"),
-  gamePong: document.querySelector("#gamePong"),
   gameLunar: document.querySelector("#gameLunar"),
   activeGameTitle: document.querySelector("#activeGameTitle"),
   gameObjective: document.querySelector("#gameObjective"),
@@ -34,11 +33,6 @@ const ui = {
   pipeSettings: document.querySelector("#pipeSettings"),
   pipeGap: document.querySelector("#pipeGap"),
   pipeSpacing: document.querySelector("#pipeSpacing"),
-  pongSettings: document.querySelector("#pongSettings"),
-  pongBallSpeed: document.querySelector("#pongBallSpeed"),
-  pongBallSpeedValue: document.querySelector("#pongBallSpeedValue"),
-  pongPaddleSize: document.querySelector("#pongPaddleSize"),
-  pongPaddleSizeValue: document.querySelector("#pongPaddleSizeValue"),
   lunarSettings: document.querySelector("#lunarSettings"),
   lunarGravity: document.querySelector("#lunarGravity"),
   lunarGravityValue: document.querySelector("#lunarGravityValue"),
@@ -55,7 +49,6 @@ const ui = {
   clearChampion: document.querySelector("#clearChampion"),
   championStatus: document.querySelector("#championStatus"),
   explanationPipe: document.querySelector("#explanationPipe"),
-  explanationPong: document.querySelector("#explanationPong"),
   explanationLunar: document.querySelector("#explanationLunar"),
 };
 
@@ -71,7 +64,6 @@ const DEFAULT_HIDDEN = 7;
 const PIPE_CHAMPION_STORAGE_KEY = "neuro-evolution-arcade.pipe-runner.champion";
 const PIPE_PREVIOUS_CHAMPION_STORAGE_KEY = "neuro-evolution-arcade.flappy.champion";
 const PIPE_LEGACY_CHAMPION_STORAGE_KEY = "ai-flappy-evolution.champion";
-const PONG_CHAMPION_STORAGE_KEY = "neuro-evolution-arcade.pong.champion";
 const LUNAR_CHAMPION_STORAGE_KEY = "neuro-evolution-arcade.lunar.champion";
 const PRESETS = {
   easy: { speed: 2, mutation: 0.08, pipeGap: 190, pipeSpacing: 305 },
@@ -81,12 +73,10 @@ const PRESETS = {
 };
 
 const PIPE_INPUT_LABELS = ["height", "velocity", "pipe x", "gap top", "gap bottom", "next gap"];
-const PONG_INPUT_LABELS = ["paddle y", "ball x", "ball y", "ball vx", "ball vy", "impact y", "impact dy", "time"];
 const LUNAR_INPUT_LABELS = ["x", "altitude", "vx", "vy", "angle", "fuel", "pad dx", "spin"];
 
 const games = {
   pipe: createPipeGame(),
-  pong: createPongGame(),
   lunar: createLunarGame(),
 };
 
@@ -288,7 +278,7 @@ function stepAi() {
   game.stepWorld(world, frame);
   for (const agent of agents) game.updateAgent(agent, world, frame);
 
-  score = Math.max(0, ...agents.map((agent) => agent.score));
+  score = game.scoreMetric ? game.scoreMetric(agents, world) : Math.max(0, ...agents.map((agent) => agent.score));
   bestScore = Math.max(bestScore, score);
 
   const alive = agents.filter((agent) => agent.alive).length;
@@ -528,7 +518,6 @@ function setGame(nextGameKey) {
 
 function updateGameUi() {
   ui.gamePipe.classList.toggle("is-active", activeGameKey === "pipe");
-  ui.gamePong.classList.toggle("is-active", activeGameKey === "pong");
   ui.gameLunar.classList.toggle("is-active", activeGameKey === "lunar");
   ui.activeGameTitle.textContent = game.title;
   ui.gameObjective.textContent = game.objective;
@@ -539,17 +528,13 @@ function updateGameUi() {
   ui.distanceLabel.textContent = game.distanceLabel;
   ui.leaderFitnessLabel.textContent = game.leaderFitnessLabel;
   const pipeActive = activeGameKey === "pipe";
-  const pongActive = activeGameKey === "pong";
   const lunarActive = activeGameKey === "lunar";
   setSettingsPanel(ui.pipeSettings, pipeActive);
-  setSettingsPanel(ui.pongSettings, pongActive);
   setSettingsPanel(ui.lunarSettings, lunarActive);
   setSettingsPanel(ui.presetPanel, pipeActive);
   ui.explanationPipe.classList.toggle("is-hidden", activeGameKey !== "pipe");
-  ui.explanationPong.classList.toggle("is-hidden", activeGameKey !== "pong");
   ui.explanationLunar.classList.toggle("is-hidden", activeGameKey !== "lunar");
   ui.preset.disabled = !pipeActive;
-  updatePongSettingOutputs();
   updateLunarSettingOutputs();
 }
 
@@ -557,11 +542,6 @@ function setSettingsPanel(element, active) {
   element.hidden = !active;
   element.classList.toggle("is-hidden", !active);
   element.classList.toggle("settings-visible", active);
-}
-
-function updatePongSettingOutputs() {
-  ui.pongBallSpeedValue.textContent = Number(ui.pongBallSpeed.value).toFixed(1);
-  ui.pongPaddleSizeValue.textContent = ui.pongPaddleSize.value;
 }
 
 function updateLunarSettingOutputs() {
@@ -984,345 +964,6 @@ function createPipeGame() {
   };
 }
 
-function createPongGame() {
-  const PADDLE_X = 58;
-  const PADDLE_WIDTH = 14;
-  const BALL_RADIUS = 9;
-  const PADDLE_SPEED = 8;
-  const TOP_WALL = 18;
-  const BOTTOM_WALL = HEIGHT - 18;
-  const RIGHT_WALL = WIDTH - 28;
-
-  function paddleHeight() {
-    return clamp(Math.round(numberValue(ui.pongPaddleSize, 96)), 62, 122);
-  }
-
-  function ballSpeed() {
-    return clamp(numberValue(ui.pongBallSpeed, 4.8), 3.8, 7.2);
-  }
-
-  function activePaddleHeight(agent) {
-    const baseHeight = paddleHeight();
-    if (!agent) return baseHeight;
-    return clamp(baseHeight - agent.score * 3.8, 38, baseHeight);
-  }
-
-  function ballSpeedLimit(agent) {
-    return ballSpeed() + 1.8 + Math.min(agent.score * 0.14, 4.8);
-  }
-
-  function verticalBounds() {
-    return {
-      top: TOP_WALL + BALL_RADIUS,
-      bottom: BOTTOM_WALL - BALL_RADIUS,
-    };
-  }
-
-  function reflectY(rawY) {
-    const { top, bottom } = verticalBounds();
-    const span = bottom - top;
-    if (span <= 0) return top;
-    let position = (rawY - top) % (span * 2);
-    if (position < 0) position += span * 2;
-    return position <= span ? top + position : bottom - (position - span);
-  }
-
-  function predictedImpactY(agent) {
-    if (agent.ballVx >= -0.01) return agent.ballY;
-    const targetX = PADDLE_X + PADDLE_WIDTH + BALL_RADIUS;
-    const framesToPaddle = Math.max(0, (agent.ballX - targetX) / Math.abs(agent.ballVx));
-    return reflectY(agent.ballY + agent.ballVy * framesToPaddle);
-  }
-
-  function framesToImpact(agent) {
-    if (agent.ballVx >= -0.01) return 1;
-    const targetX = PADDLE_X + PADDLE_WIDTH + BALL_RADIUS;
-    return clamp((agent.ballX - targetX) / Math.abs(agent.ballVx) / 160, 0, 1);
-  }
-
-  function actionTowardImpact(agent, impactY = predictedImpactY(agent)) {
-    const center = agent.paddleY + activePaddleHeight(agent) / 2;
-    if (impactY < center - 6) return 0;
-    if (impactY > center + 6) return 2;
-    return 1;
-  }
-
-  function trackingGenome(config) {
-    const genome = Array.from({ length: genomeLength(config) }, () => 0);
-    const hiddenStride = config.inputs + 1;
-    genome[0] = 5.2;
-    genome[2] = -5.2;
-    genome[hiddenStride] = -5.2;
-    genome[hiddenStride + 2] = 5.2;
-
-    const outputStart = config.inputs * config.hidden + config.hidden;
-    const outputStride = config.hidden + 1;
-    genome[outputStart] = 3.4;
-    genome[outputStart + config.hidden] = -0.25;
-    genome[outputStart + outputStride + config.hidden] = 0.25;
-    genome[outputStart + outputStride * 2 + 1] = 3.4;
-    genome[outputStart + outputStride * 2 + config.hidden] = -0.25;
-    return genome;
-  }
-
-  function resetPong(agent) {
-    const height = paddleHeight();
-    const speed = ballSpeed();
-    agent.paddleY = HEIGHT / 2 - height / 2;
-    agent.ballX = WIDTH * (0.62 + Math.random() * 0.18);
-    agent.ballY = HEIGHT * (0.28 + Math.random() * 0.44);
-    agent.ballVx = -speed;
-    agent.ballVy = (Math.random() * 2 - 1) * speed * 0.58;
-    agent.alive = true;
-    agent.fitness = 0;
-    agent.score = 0;
-    agent.age = 0;
-    agent.lastImpactDistance = Math.abs(predictedImpactY(agent) - (agent.paddleY + height / 2));
-    agent.pendingAction = 1;
-  }
-
-  function inputsFor(agent) {
-    const height = activePaddleHeight(agent);
-    const paddleCenter = agent.paddleY + height / 2;
-    const impactY = predictedImpactY(agent);
-    return [
-      paddleCenter / HEIGHT,
-      agent.ballX / WIDTH,
-      agent.ballY / HEIGHT,
-      agent.ballVx / 10,
-      agent.ballVy / 10,
-      impactY / HEIGHT,
-      (impactY - paddleCenter) / HEIGHT,
-      framesToImpact(agent),
-    ];
-  }
-
-  function chooseAction(agent) {
-    const outputs = feedForward(agent.genome, inputsFor(agent));
-    return outputs.indexOf(Math.max(...outputs));
-  }
-
-  function applyPaddleAction(agent, action) {
-    const height = activePaddleHeight(agent);
-    if (action === 0) agent.paddleY -= PADDLE_SPEED;
-    if (action === 2) agent.paddleY += PADDLE_SPEED;
-    agent.paddleY = clamp(agent.paddleY, TOP_WALL, BOTTOM_WALL - height);
-  }
-
-  function updatePong(agent, action = 1) {
-    if (!agent.alive) return;
-
-    const height = activePaddleHeight(agent);
-    const beforeCenter = agent.paddleY + height / 2;
-    const beforeImpact = predictedImpactY(agent);
-    const beforeImpactDistance = Math.abs(beforeImpact - beforeCenter);
-    const incoming = agent.ballVx < 0;
-    const desiredAction = actionTowardImpact(agent, beforeImpact);
-
-    applyPaddleAction(agent, action);
-    agent.ballX += agent.ballVx;
-    agent.ballY += agent.ballVy;
-    agent.age += 1;
-
-    if (agent.ballY - BALL_RADIUS < TOP_WALL) {
-      agent.ballY = TOP_WALL + BALL_RADIUS;
-      agent.ballVy = Math.abs(agent.ballVy);
-    }
-    if (agent.ballY + BALL_RADIUS > BOTTOM_WALL) {
-      agent.ballY = BOTTOM_WALL - BALL_RADIUS;
-      agent.ballVy = -Math.abs(agent.ballVy);
-    }
-    if (agent.ballX + BALL_RADIUS > RIGHT_WALL) {
-      agent.ballX = RIGHT_WALL - BALL_RADIUS;
-      agent.ballVx = -Math.abs(agent.ballVx);
-      agent.ballVy = clamp(agent.ballVy + (Math.random() * 2 - 1) * 1.15, -10.4, 10.4);
-    }
-
-    const paddleCenter = agent.paddleY + height / 2;
-    const impactY = predictedImpactY(agent);
-    const impactDistance = Math.abs(impactY - paddleCenter);
-    const ballDistance = Math.abs(agent.ballY - paddleCenter);
-    agent.fitness += incoming ? 0.6 : 0.2;
-
-    if (incoming) {
-      agent.fitness += Math.max(0, 1 - impactDistance / (height * 1.7)) * 14;
-      agent.fitness += action === desiredAction ? 8 : -6;
-      if (impactDistance < beforeImpactDistance) agent.fitness += 4;
-      else agent.fitness -= 1.5;
-    } else {
-      agent.fitness += Math.max(0, 1 - ballDistance / 260);
-    }
-
-    agent.lastImpactDistance = impactDistance;
-
-    const hitsPaddleX =
-      agent.ballVx < 0 &&
-      agent.ballX - BALL_RADIUS <= PADDLE_X + PADDLE_WIDTH &&
-      agent.ballX + BALL_RADIUS >= PADDLE_X;
-    const hitsPaddleY = agent.ballY >= agent.paddleY && agent.ballY <= agent.paddleY + height;
-
-    if (hitsPaddleX && hitsPaddleY) {
-      const offset = clamp((agent.ballY - paddleCenter) / (height / 2), -1, 1);
-      agent.ballX = PADDLE_X + PADDLE_WIDTH + BALL_RADIUS;
-      agent.score += 1;
-      agent.ballVx = Math.min(Math.abs(agent.ballVx) + 0.42, ballSpeedLimit(agent));
-      agent.ballVy = clamp(agent.ballVy + offset * 3.4 + (Math.random() * 2 - 1) * 1.2, -10.4, 10.4);
-      agent.fitness += 1200 + agent.score * 180 + Math.max(0, 1 - Math.abs(offset)) * 180;
-    }
-
-    if (agent.ballX + BALL_RADIUS < 0) {
-      agent.alive = false;
-      agent.fitness -= 450 + impactDistance * 2;
-    }
-  }
-
-  function drawPong(targetCtx, agent, mode, currentScore) {
-    targetCtx.fillStyle = "#172026";
-    targetCtx.fillRect(0, 0, WIDTH, HEIGHT);
-
-    targetCtx.strokeStyle = "rgba(255,255,255,0.18)";
-    targetCtx.lineWidth = 3;
-    targetCtx.setLineDash([12, 16]);
-    targetCtx.beginPath();
-    targetCtx.moveTo(WIDTH / 2, 24);
-    targetCtx.lineTo(WIDTH / 2, HEIGHT - 24);
-    targetCtx.stroke();
-    targetCtx.setLineDash([]);
-
-    targetCtx.fillStyle = "#f7faf8";
-    const height = activePaddleHeight(agent);
-    const impactY = predictedImpactY(agent);
-
-    targetCtx.fillRect(PADDLE_X, agent.paddleY, PADDLE_WIDTH, height);
-    targetCtx.fillRect(WIDTH - 32, 24, 8, HEIGHT - 48);
-
-    targetCtx.fillStyle = "#f2c14e";
-    targetCtx.beginPath();
-    targetCtx.arc(agent.ballX, agent.ballY, BALL_RADIUS, 0, Math.PI * 2);
-    targetCtx.fill();
-
-    targetCtx.strokeStyle = "rgba(242,193,78,0.32)";
-    targetCtx.beginPath();
-    targetCtx.moveTo(PADDLE_X + PADDLE_WIDTH, agent.paddleY + height / 2);
-    targetCtx.lineTo(agent.ballX, agent.ballY);
-    targetCtx.stroke();
-
-    if (agent.ballVx < 0) {
-      targetCtx.strokeStyle = "rgba(255,255,255,0.28)";
-      targetCtx.setLineDash([6, 8]);
-      targetCtx.beginPath();
-      targetCtx.moveTo(PADDLE_X + PADDLE_WIDTH + BALL_RADIUS, impactY);
-      targetCtx.lineTo(agent.ballX, agent.ballY);
-      targetCtx.stroke();
-      targetCtx.setLineDash([]);
-    }
-
-    drawScoreBadge(targetCtx, currentScore);
-    drawCrashOverlay(targetCtx, mode, agent, "Press an arrow key or Reset to play again");
-  }
-
-  return {
-    key: "pong",
-    title: "Pong",
-    objective: "Les agents apprennent a placer le paddle pour renvoyer la balle le plus longtemps possible.",
-    hint: "IA: un specimen joue un rally complet, puis le suivant est teste. Humain: fleches ou WASD.",
-    sequential: true,
-    defaultPopulation: 36,
-    defaultMutation: 0.14,
-    defaultSpeed: 14,
-    maxSpeed: 55,
-    speedLabel: "Training speed",
-    populationLabel: "Specimens",
-    leaderFitnessLabel: "Current specimen",
-    inputs: 8,
-    hidden: 9,
-    outputs: 3,
-    inputLabels: PONG_INPUT_LABELS,
-    outputLabels: ["up", "stay", "down"],
-    outputLabel: "Move",
-    distanceLabel: "Ball distance",
-    championStorageKey: PONG_CHAMPION_STORAGE_KEY,
-    championStorageKeys: [PONG_CHAMPION_STORAGE_KEY],
-    defaultChampionStatus: "No Pong champion saved yet.",
-    humanNetworkMessage: "Switch to AI training to view the Pong network.",
-    createWorld() {
-      return { activeAgentIndex: 0 };
-    },
-    seedGenomes() {
-      return [trackingGenome(this)];
-    },
-    makeAgent(id, genome) {
-      return {
-        id,
-        genome,
-        alive: false,
-        fitness: 0,
-        score: 0,
-        age: 0,
-      paddleY: HEIGHT / 2 - paddleHeight() / 2,
-        ballX: WIDTH * 0.68,
-        ballY: HEIGHT / 2,
-        ballVx: -ballSpeed(),
-        ballVy: 0,
-        lastImpactDistance: 0,
-        pendingAction: 1,
-      };
-    },
-    makeHumanAgent(id) {
-      return this.makeAgent(id, createGenome(this));
-    },
-    resetAgents(nextAgents, targetWorld) {
-      targetWorld.activeAgentIndex = 0;
-      for (const agent of nextAgents) {
-        agent.alive = false;
-        agent.fitness = 0;
-        agent.score = 0;
-        agent.age = 0;
-      }
-    },
-    startAgent(agent) {
-      resetPong(agent);
-    },
-    resetHuman(agent) {
-      resetPong(agent);
-    },
-    stepWorld() {},
-    updateAgent(agent) {
-      updatePong(agent, chooseAction(agent));
-    },
-    updateHuman(agent) {
-      if (!agent) return;
-      updatePong(agent, agent.pendingAction ?? 1);
-      agent.pendingAction = 1;
-    },
-    humanPrimaryAction() {},
-    handleHumanKey(event, agent) {
-      if (!agent) return false;
-      const actions = {
-        ArrowUp: 0,
-        KeyW: 0,
-        ArrowDown: 2,
-        KeyS: 2,
-      };
-      if (actions[event.code] === undefined) return false;
-      agent.pendingAction = actions[event.code];
-      return true;
-    },
-    distanceMetric(agent) {
-      if (!agent) return 0;
-      return Math.round(Math.abs(predictedImpactY(agent) - (agent.paddleY + activePaddleHeight(agent) / 2)));
-    },
-    draw(targetCtx, targetWorld, visibleAgents, mode, currentScore) {
-      const agent = visibleAgents[0];
-      if (!agent) {
-        targetCtx.clearRect(0, 0, WIDTH, HEIGHT);
-        return;
-      }
-      drawPong(targetCtx, agent, mode, currentScore);
-    },
-  };
-}
-
 function createLunarGame() {
   const MOON_Y = HEIGHT - GROUND;
   const LANDER_WIDTH = 28;
@@ -1331,6 +972,7 @@ function createLunarGame() {
   const ROTATE_ACCEL = 0.012;
   const MAX_ANGLE = 1.25;
   const MAX_STEPS = 1150;
+  const MAX_ATTEMPTS = 5;
 
   function lunarGravity() {
     return clamp(numberValue(ui.lunarGravity, 0.07), 0.045, 0.105);
@@ -1355,7 +997,7 @@ function createLunarGame() {
     };
   }
 
-  function resetLander(agent, targetWorld) {
+  function resetLander(agent, targetWorld, resetTotals = true) {
     const fuel = initialFuel();
     agent.x = WIDTH * (0.34 + Math.random() * 0.32);
     agent.y = 72 + Math.random() * 34;
@@ -1368,8 +1010,13 @@ function createLunarGame() {
     agent.alive = true;
     agent.landed = false;
     agent.crashed = false;
-    agent.fitness = 0;
-    agent.score = 0;
+    if (resetTotals) {
+      agent.fitness = 0;
+      agent.score = 0;
+      agent.attempts = 0;
+      agent.completed = false;
+    }
+    agent.attempts += 1;
     agent.age = 0;
     agent.pendingThrust = false;
     agent.pendingLeft = false;
@@ -1469,8 +1116,6 @@ function createLunarGame() {
     const distance = distanceToPad(agent, targetWorld);
     const approach = previousDistance - distance;
     agent.lastDistance = distance;
-    agent.score = Math.max(agent.score, Math.round(Math.max(0, 120 - padDx / 4 - speed * 15 - angleAbs * 26)));
-
     agent.fitness += 1;
     agent.fitness += Math.max(0, 1 - padDx / 430) * 2.4;
     agent.fitness += Math.max(0, 1 - speed / 4.2) * 2.1;
@@ -1488,12 +1133,15 @@ function createLunarGame() {
       agent.crashed = !agent.landed;
 
       if (agent.landed) {
-        agent.score = Math.max(agent.score, Math.round(220 + agent.fuel));
-        agent.fitness += 9000 + agent.fuel * 18 - agent.age * 1.8;
+        agent.score += 1;
+        agent.completed = true;
+        agent.fitness += 12000 + agent.fuel * 22 - agent.age * 1.8;
       } else {
         const controlledImpact = Math.max(0, 1 - speed / 2.4) * 1000 + Math.max(0, 1 - angleAbs / 0.7) * 700;
         agent.fitness += onPad ? 1400 + controlledImpact : 0;
         agent.fitness -= 1100 + padDx * 1.8 + speed * 340 + angleAbs * 650 + altitude;
+        if (agent.attempts < MAX_ATTEMPTS) resetLander(agent, targetWorld, false);
+        else agent.completed = true;
       }
     }
 
@@ -1501,6 +1149,8 @@ function createLunarGame() {
       agent.alive = false;
       agent.crashed = true;
       agent.fitness -= 500 + distance * 1.2;
+      if (agent.attempts < MAX_ATTEMPTS) resetLander(agent, targetWorld, false);
+      else agent.completed = true;
     }
   }
 
@@ -1622,6 +1272,8 @@ function createLunarGame() {
         crashed: false,
         fitness: 0,
         score: 0,
+        attempts: 0,
+        completed: false,
         age: 0,
         lastDistance: 0,
         pendingThrust: false,
@@ -1674,6 +1326,9 @@ function createLunarGame() {
       if (!agent || !targetWorld?.pad) return 0;
       return Math.round(distanceToPad(agent, targetWorld));
     },
+    scoreMetric(nextAgents) {
+      return nextAgents.reduce((total, agent) => total + agent.score, 0);
+    },
     draw(targetCtx, targetWorld, visibleAgents, mode, currentScore) {
       drawLunarBackground(targetCtx, targetWorld);
       const ordered = [...visibleAgents].sort((a, b) => b.fitness - a.fitness);
@@ -1719,7 +1374,6 @@ ui.reset.addEventListener("click", resetAll);
 ui.modeAi.addEventListener("click", () => setMode("ai"));
 ui.modeHuman.addEventListener("click", () => setMode("human"));
 ui.gamePipe.addEventListener("click", () => setGame("pipe"));
-ui.gamePong.addEventListener("click", () => setGame("pong"));
 ui.gameLunar.addEventListener("click", () => setGame("lunar"));
 ui.speed.addEventListener("input", () => {
   ui.speedValue.textContent = `${ui.speed.value}x`;
@@ -1737,10 +1391,6 @@ ui.pipeSpacing.addEventListener("change", () => {
   ui.preset.value = "custom";
   resetAll();
 });
-for (const control of [ui.pongBallSpeed, ui.pongPaddleSize]) {
-  control.addEventListener("input", updatePongSettingOutputs);
-  control.addEventListener("change", resetAll);
-}
 for (const control of [ui.lunarGravity, ui.lunarFuel, ui.lunarPadSize, ui.lunarThrust]) {
   control.addEventListener("input", updateLunarSettingOutputs);
   control.addEventListener("change", resetAll);

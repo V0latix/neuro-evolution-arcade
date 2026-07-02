@@ -43,9 +43,6 @@
             <button id="gamePipe" class="game-tab is-active" type="button">
               <strong>Flappy Bird</strong>
             </button>
-            <button id="gamePong" class="game-tab" type="button">
-              <strong>Pong</strong>
-            </button>
             <button id="gameLunar" class="game-tab" type="button">
               <strong>Lunar Lander</strong>
             </button>
@@ -99,33 +96,6 @@
             </p>
           </section>
 
-          <section id="explanationPong" class="panel-section explanation is-hidden">
-            <h2>Comment Pong apprend</h2>
-            <p>
-              Chaque specimen controle un paddle a gauche de l'ecran. Le reseau observe la position
-              du paddle, la position de la balle, sa vitesse, l'ecart vertical avec la balle et
-              une estimation du point d'impact sur le paddle. Il choisit directement entre trois
-              actions : monter, rester stable ou descendre.
-            </p>
-            <p>
-              Un specimen joue un rally complet dans sa propre partie. Il gagne du fitness en
-              allant dans la bonne direction quand la balle arrive, en rapprochant le paddle de
-              l'impact predit et surtout en renvoyant la balle. Quand il rate la balle, le specimen
-              suivant commence un nouveau rally.
-            </p>
-            <p>
-              Le premier genome Pong suit seulement la balle actuelle : il n'est pas parfait. Les
-              generations utiles apprennent a utiliser l'impact predit. Apres chaque retour, la
-              trajectoire varie, la balle accelere et le paddle devient plus petit, ce qui rend les
-              longs rallys de plus en plus difficiles.
-            </p>
-            <p>
-              Les reglages Pong a droite permettent de modifier la vitesse de la balle, la taille du
-              paddle et la vitesse d'entrainement. Chaque changement relance l'entrainement pour
-              comparer les specimens sur les memes conditions.
-            </p>
-          </section>
-
           <section id="explanationLunar" class="panel-section explanation is-hidden">
             <h2>Comment Lunar Lander apprend</h2>
             <p>
@@ -139,9 +109,9 @@
               son fuel, corriger son angle, ralentir sa chute et viser la zone d'atterrissage.
             </p>
             <p>
-              La fitness recompense l'approche de la plateforme, une descente controlee et les
-              atterrissages propres. Elle penalise les crashs rapides, l'angle trop fort, la vitesse
-              trop elevee et le fuel gaspille.
+              Chaque specimen joue plusieurs essais dans la meme generation jusqu'a reussir ou
+              epuiser ses tentatives. Le score affiche compte le nombre total d'alunissages reussis
+              dans la generation. La fitness est cumulee sur tous les essais du specimen.
             </p>
           </section>
         </div>
@@ -186,19 +156,6 @@
               Espacement tuyaux
               <input id="pipeSpacing" type="number" min="170" max="420" step="5" value="245" />
             </label>
-          </div>
-
-          <div id="pongSettings" class="panel-section is-hidden">
-            <label for="pongBallSpeed">Vitesse balle</label>
-            <div class="range-row">
-              <input id="pongBallSpeed" type="range" min="3.8" max="7.2" step="0.2" value="4.8" />
-              <output id="pongBallSpeedValue" for="pongBallSpeed">4.8</output>
-            </div>
-            <label for="pongPaddleSize">Taille paddle</label>
-            <div class="range-row">
-              <input id="pongPaddleSize" type="range" min="62" max="122" step="4" value="96" />
-              <output id="pongPaddleSizeValue" for="pongPaddleSize">96</output>
-            </div>
           </div>
 
           <div id="lunarSettings" class="panel-section is-hidden">
