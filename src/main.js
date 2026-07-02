@@ -38,8 +38,6 @@ const ui = {
   pongBallSpeedValue: document.querySelector("#pongBallSpeedValue"),
   pongPaddleSize: document.querySelector("#pongPaddleSize"),
   pongPaddleSizeValue: document.querySelector("#pongPaddleSizeValue"),
-  pongRallyLength: document.querySelector("#pongRallyLength"),
-  pongRallyLengthValue: document.querySelector("#pongRallyLengthValue"),
   presetPanel: document.querySelector("#presetPanel"),
   preset: document.querySelector("#preset"),
   saveChampion: document.querySelector("#saveChampion"),
@@ -542,7 +540,6 @@ function updateGameUi() {
 function updatePongSettingOutputs() {
   ui.pongBallSpeedValue.textContent = Number(ui.pongBallSpeed.value).toFixed(1);
   ui.pongPaddleSizeValue.textContent = ui.pongPaddleSize.value;
-  ui.pongRallyLengthValue.textContent = ui.pongRallyLength.value;
 }
 
 function applyPreset(name) {
@@ -975,10 +972,6 @@ function createPongGame() {
     return clamp(numberValue(ui.pongBallSpeed, 4.8), 3.8, 7.2);
   }
 
-  function returnPatience() {
-    return clamp(Math.round(numberValue(ui.pongRallyLength, 1800)), 700, 2400);
-  }
-
   function verticalBounds() {
     return {
       top: TOP_WALL + BALL_RADIUS,
@@ -1041,7 +1034,6 @@ function createPongGame() {
     agent.fitness = 0;
     agent.score = 0;
     agent.age = 0;
-    agent.stepsSinceReturn = 0;
     agent.lastImpactDistance = Math.abs(predictedImpactY(agent) - (agent.paddleY + height / 2));
     agent.pendingAction = 1;
   }
@@ -1095,7 +1087,6 @@ function createPongGame() {
     agent.ballX += agent.ballVx;
     agent.ballY += agent.ballVy;
     agent.age += 1;
-    agent.stepsSinceReturn += 1;
 
     if (agent.ballY - BALL_RADIUS < TOP_WALL) {
       agent.ballY = TOP_WALL + BALL_RADIUS;
@@ -1140,7 +1131,6 @@ function createPongGame() {
       agent.ballVx = Math.min(Math.abs(agent.ballVx) + 0.14, ballSpeed() + 2.4);
       agent.ballVy = clamp(agent.ballVy + offset * 2.6, -8.2, 8.2);
       agent.score += 1;
-      agent.stepsSinceReturn = 0;
       agent.fitness += 1200 + agent.score * 180 + Math.max(0, 1 - Math.abs(offset)) * 180;
     }
 
@@ -1149,10 +1139,6 @@ function createPongGame() {
       agent.fitness -= 450 + impactDistance * 2;
     }
 
-    if (agent.stepsSinceReturn >= returnPatience()) {
-      agent.alive = false;
-      agent.fitness -= 140 + impactDistance;
-    }
   }
 
   function drawPong(targetCtx, agent, mode, currentScore) {
@@ -1238,7 +1224,6 @@ function createPongGame() {
         fitness: 0,
         score: 0,
         age: 0,
-        stepsSinceReturn: 0,
         paddleY: HEIGHT / 2 - paddleHeight() / 2,
         ballX: WIDTH * 0.68,
         ballY: HEIGHT / 2,
@@ -1258,7 +1243,6 @@ function createPongGame() {
         agent.fitness = 0;
         agent.score = 0;
         agent.age = 0;
-        agent.stepsSinceReturn = 0;
       }
     },
     startAgent(agent) {
@@ -1356,7 +1340,7 @@ ui.pipeSpacing.addEventListener("change", () => {
   ui.preset.value = "custom";
   resetAll();
 });
-for (const control of [ui.pongBallSpeed, ui.pongPaddleSize, ui.pongRallyLength]) {
+for (const control of [ui.pongBallSpeed, ui.pongPaddleSize]) {
   control.addEventListener("input", updatePongSettingOutputs);
   control.addEventListener("change", resetAll);
 }

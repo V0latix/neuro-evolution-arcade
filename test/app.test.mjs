@@ -274,8 +274,6 @@ test("static app includes every primary control and asset reference", async () =
     "pongBallSpeedValue",
     "pongPaddleSize",
     "pongPaddleSizeValue",
-    "pongRallyLength",
-    "pongRallyLengthValue",
     "presetPanel",
     "preset",
     "leaderFitnessLabel",
@@ -353,7 +351,6 @@ test("game picker switches to Pong with sequential rally controls and network sh
   assert.equal(element(harness, "speed").max, 55);
   assert.equal(element(harness, "pongBallSpeedValue").textContent, "4.8");
   assert.equal(element(harness, "pongPaddleSizeValue").textContent, "96");
-  assert.equal(element(harness, "pongRallyLengthValue").textContent, "1800");
   assert.match(String(element(harness, "alive").textContent), /^[1-9]\/36$/);
 
   const networkCalls = element(harness, "network").getContext().calls;
