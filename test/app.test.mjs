@@ -10,6 +10,7 @@ const root = new URL("../", import.meta.url);
 const pipeChampionStorageKey = "neuro-evolution-arcade.pipe-runner.champion";
 const legacyChampionStorageKey = "ai-flappy-evolution.champion";
 const snakeChampionStorageKey = "neuro-evolution-arcade.snake.champion";
+const pongChampionStorageKey = "neuro-evolution-arcade.pong.champion";
 const execFileAsync = promisify(execFile);
 
 class ClassList {
@@ -258,6 +259,7 @@ test("static app includes every primary control and asset reference", async () =
     "modeHuman",
     "gamePipe",
     "gameSnake",
+    "gamePong",
     "activeGameTitle",
     "gameObjective",
     "gameHint",
@@ -284,11 +286,15 @@ test("static app includes every primary control and asset reference", async () =
 
   assert.match(html, /Comment les generations apprennent/);
   assert.match(html, /Comment Snake apprend/);
+  assert.match(html, /Comment Pong apprend/);
   assert.match(html, /Neuro Evolution Arcade/);
   assert.match(html, /Flappy Bird/);
+  assert.match(html, /Pong/);
   assert.match(script, /inputs: 6/);
   assert.match(script, /inputs: 10/);
+  assert.match(script, /PONG_INPUT_LABELS/);
   assert.match(script, /outputLabels: \["up", "right", "down", "left"\]/);
+  assert.match(script, /outputLabels: \["up", "stay", "down"\]/);
   assert.match(script, /next gap/);
 });
 
@@ -358,6 +364,39 @@ test("game picker switches to Snake with its own controls and network shape", as
   assert.equal(labels.includes("down"), true);
   assert.equal(labels.includes("left"), true);
   assert.equal(labels.includes("right"), true);
+});
+
+test("game picker switches to Pong with sequential rally controls and network shape", async () => {
+  const harness = await loadHarness();
+
+  element(harness, "gamePong").click();
+  harness.runFrame();
+
+  assert.equal(element(harness, "activeGameTitle").textContent, "Pong");
+  assert.equal(element(harness, "gamePong").classList.contains("is-active"), true);
+  assert.equal(element(harness, "pipeSettings").classList.contains("is-hidden"), true);
+  assert.equal(element(harness, "snakeSettings").classList.contains("is-hidden"), true);
+  assert.equal(element(harness, "presetPanel").classList.contains("is-hidden"), true);
+  assert.equal(element(harness, "aliveLabel").textContent, "Specimen");
+  assert.equal(element(harness, "speedLabel").textContent, "Rally speed");
+  assert.equal(element(harness, "distanceLabel").textContent, "Ball distance");
+  assert.equal(element(harness, "speed").value, 10);
+  assert.equal(element(harness, "speed").max, 40);
+  assert.match(String(element(harness, "alive").textContent), /^[1-9]\/10$/);
+
+  const networkCalls = element(harness, "network").getContext().calls;
+  const labels = networkCalls.filter((call) => call.type === "fillText").map((call) => call.text);
+  assert.deepEqual(labels.slice(0, 6), [
+    "paddle y",
+    "ball x",
+    "ball y",
+    "ball vx",
+    "ball vy",
+    "target dy",
+  ]);
+  assert.equal(labels.includes("up"), true);
+  assert.equal(labels.includes("stay"), true);
+  assert.equal(labels.includes("down"), true);
 });
 
 test("training controls evolve generations and difficulty presets update numeric settings", async () => {
@@ -434,6 +473,31 @@ test("Snake human mode uses arrow keys and keeps AI-only actions disabled", asyn
   assert.equal(element(harness, "activeGameTitle").textContent, "Snake");
 });
 
+test("Pong human mode uses arrow keys and keeps AI-only actions disabled", async () => {
+  const harness = await loadHarness();
+
+  element(harness, "gamePong").click();
+  element(harness, "modeHuman").click();
+  harness.runFrame();
+
+  assert.equal(element(harness, "generation").textContent, "Human");
+  assert.equal(element(harness, "alive").textContent, 1);
+  assert.equal(element(harness, "nextGen").disabled, true);
+
+  let prevented = false;
+  harness.window.dispatchEvent({
+    type: "keydown",
+    code: "ArrowDown",
+    preventDefault() {
+      prevented = true;
+    },
+  });
+  harness.runFrame(2);
+
+  assert.equal(prevented, true);
+  assert.equal(element(harness, "activeGameTitle").textContent, "Pong");
+});
+
 test("champion save, load, clear, and incompatible payload handling work", async () => {
   const harness = await loadHarness();
   harness.runFrame();
@@ -474,6 +538,25 @@ test("Snake champions are saved under the Snake key with compatible genome lengt
   element(harness, "loadChampion").click();
   harness.runFrame();
   assert.match(element(harness, "championStatus").textContent, /Snake champion loaded/);
+});
+
+test("Pong champions are saved under the Pong key with compatible genome length", async () => {
+  const harness = await loadHarness();
+
+  element(harness, "gamePong").click();
+  harness.runFrame();
+
+  element(harness, "saveChampion").click();
+  const saved = JSON.parse(harness.storage.getItem(pongChampionStorageKey));
+
+  assert.equal(saved.game, "pong");
+  assert.equal(saved.genome.length, 73);
+  assert.equal(saved.inputs, 6);
+  assert.equal(saved.outputs, 3);
+
+  element(harness, "loadChampion").click();
+  harness.runFrame();
+  assert.match(element(harness, "championStatus").textContent, /Pong champion loaded/);
 });
 
 test("legacy champion storage key remains loadable after project rename", async () => {

@@ -3,8 +3,8 @@
 Neuro Evolution Arcade is a browser playground for training small neural
 networks to play arcade-style games through neuroevolution.
 
-The first available game is Flappy Bird. Snake is now available
-as the second game. The long-term direction is to add more games that reuse the
+The first available game is Flappy Bird. Snake and Pong are now available as
+additional games. The long-term direction is to add more games that reuse the
 same learning loop: observe game state, decide an action, score fitness, select
 the strongest agents, cross over their networks, mutate weights, and run a new
 generation.
@@ -13,7 +13,7 @@ generation.
 
 The app currently runs entirely in the browser and includes:
 
-- Canvas-based Flappy Bird and Snake simulations
+- Canvas-based Flappy Bird, Snake, and Pong simulations
 - A game picker that separates game-specific controls and explanations
 - Populations of neural-network-controlled agents
 - Fitness scoring, elite preservation, crossover, and mutation
@@ -23,7 +23,11 @@ The app currently runs entirely in the browser and includes:
 - Snake with ten inputs and four direct actions: up, right, down, left
 - Sequential Snake evaluation: one specimen plays a full run, then the next
   specimen starts its own run
+- Pong with six inputs and three paddle actions: up, stay, down
+- Sequential Pong evaluation: one specimen plays a full rally, then the next
+  specimen starts its own rally
 - Human play mode with the space bar for Flappy Bird and arrows/WASD for Snake
+  and Pong
 - Local champion save/load via browser storage
 - Flappy Bird difficulty presets for gap, spacing, speed, and mutation
 - Snake-specific controls for grid size and food patience
@@ -42,12 +46,15 @@ sequence, and fitness score. The fitness function now prioritizes reaching food
 over simply staying alive, with strong penalties for revisiting cells or going
 too long without improving the distance to food.
 
+`Pong` trains paddle agents. The network observes the paddle position, ball
+position, ball velocity, and vertical distance from the paddle target. The
+outputs select up, stay, or down. Pong is a strong fit for this app because the
+reward is immediate and visual: align with the ball, return it, repeat.
+
 ## Next Game Ideas
 
-Strong candidates for future modules after Snake:
+Strong candidates for future modules after Pong:
 
-- `Pong`: simple physics, continuous paddle control, easy to compare AI vs
-  human.
 - `Breakout`: adds planning through brick layouts, ball angle, and survival.
 - `Dino Runner`: close to the Flappy flow, but with jump timing and obstacle
   type recognition.
@@ -60,10 +67,10 @@ Strong candidates for future modules after Snake:
 
 Recommended order:
 
-1. `Pong`, because it introduces opponent/player comparison.
-2. `Dino Runner`, because it reuses much of the current side-scroller logic.
-3. `Breakout`, because it adds richer physics and level state.
-4. `Lunar Lander Lite`, because it pushes toward continuous control.
+1. `Dino Runner`, because it reuses much of the current side-scroller logic.
+2. `Breakout`, because it extends Pong-style paddle control with richer level
+   state.
+3. `Lunar Lander Lite`, because it pushes toward continuous control.
 
 ## Run Locally
 
@@ -98,10 +105,11 @@ environment.
 - `Espacement tuyaux`: change the horizontal distance between consecutive pipes
 - `Human play`: switch to manual play, then press `Space` to flap
 - `Snake`: use arrows or WASD in human mode
+- `Pong`: use arrows or WASD in human mode
 - `Taille grille`: change the Snake board size
 - `Patience nourriture`: change how long Snake agents may survive without food
 - `Specimen speed`: in Snake, run more steps per frame while still testing one
-  specimen at a time
+  specimen at a time. In Pong, this becomes rally speed.
 - `Save` / `Load` / `Clear`: manage the best saved champion in local browser
   storage
 - `Preset difficulte`: apply easy, normal, hard, or chaos training settings

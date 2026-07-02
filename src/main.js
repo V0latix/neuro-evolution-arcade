@@ -21,6 +21,7 @@ const ui = {
   modeHuman: document.querySelector("#modeHuman"),
   gamePipe: document.querySelector("#gamePipe"),
   gameSnake: document.querySelector("#gameSnake"),
+  gamePong: document.querySelector("#gamePong"),
   activeGameTitle: document.querySelector("#activeGameTitle"),
   gameObjective: document.querySelector("#gameObjective"),
   gameHint: document.querySelector("#gameHint"),
@@ -44,6 +45,7 @@ const ui = {
   championStatus: document.querySelector("#championStatus"),
   explanationPipe: document.querySelector("#explanationPipe"),
   explanationSnake: document.querySelector("#explanationSnake"),
+  explanationPong: document.querySelector("#explanationPong"),
 };
 
 const WIDTH = 960;
@@ -59,6 +61,7 @@ const PIPE_CHAMPION_STORAGE_KEY = "neuro-evolution-arcade.pipe-runner.champion";
 const PIPE_PREVIOUS_CHAMPION_STORAGE_KEY = "neuro-evolution-arcade.flappy.champion";
 const PIPE_LEGACY_CHAMPION_STORAGE_KEY = "ai-flappy-evolution.champion";
 const SNAKE_CHAMPION_STORAGE_KEY = "neuro-evolution-arcade.snake.champion";
+const PONG_CHAMPION_STORAGE_KEY = "neuro-evolution-arcade.pong.champion";
 const PRESETS = {
   easy: { speed: 2, mutation: 0.08, pipeGap: 190, pipeSpacing: 305 },
   normal: { speed: 3, mutation: 0.1, pipeGap: 150, pipeSpacing: 245 },
@@ -79,10 +82,12 @@ const SNAKE_INPUT_LABELS = [
   "stale",
   "length",
 ];
+const PONG_INPUT_LABELS = ["paddle y", "ball x", "ball y", "ball vx", "ball vy", "target dy"];
 
 const games = {
   pipe: createPipeGame(),
   snake: createSnakeGame(),
+  pong: createPongGame(),
 };
 
 let activeGameKey = "pipe";
@@ -517,6 +522,7 @@ function setGame(nextGameKey) {
 function updateGameUi() {
   ui.gamePipe.classList.toggle("is-active", activeGameKey === "pipe");
   ui.gameSnake.classList.toggle("is-active", activeGameKey === "snake");
+  ui.gamePong.classList.toggle("is-active", activeGameKey === "pong");
   ui.activeGameTitle.textContent = game.title;
   ui.gameObjective.textContent = game.objective;
   ui.gameHint.textContent = game.hint;
@@ -529,6 +535,7 @@ function updateGameUi() {
   ui.snakeSettings.classList.toggle("is-hidden", activeGameKey !== "snake");
   ui.explanationPipe.classList.toggle("is-hidden", activeGameKey !== "pipe");
   ui.explanationSnake.classList.toggle("is-hidden", activeGameKey !== "snake");
+  ui.explanationPong.classList.toggle("is-hidden", activeGameKey !== "pong");
   ui.preset.disabled = activeGameKey !== "pipe";
   ui.presetPanel.classList.toggle("is-hidden", activeGameKey !== "pipe");
 }
@@ -1291,6 +1298,232 @@ function createSnakeGame() {
   };
 }
 
+function createPongGame() {
+  const PADDLE_X = 58;
+  const PADDLE_WIDTH = 14;
+  const PADDLE_HEIGHT = 92;
+  const BALL_RADIUS = 9;
+  const PADDLE_SPEED = 7.4;
+  const BALL_SPEED = 5.2;
+  const MAX_RALLY_FRAMES = 1600;
+
+  function resetPong(agent) {
+    agent.paddleY = HEIGHT / 2 - PADDLE_HEIGHT / 2;
+    agent.ballX = WIDTH * 0.68;
+    agent.ballY = HEIGHT * (0.28 + Math.random() * 0.44);
+    agent.ballVx = -BALL_SPEED;
+    agent.ballVy = (Math.random() * 2 - 1) * 3.4;
+    agent.alive = true;
+    agent.fitness = 0;
+    agent.score = 0;
+    agent.age = 0;
+    agent.lastDistance = Math.abs(agent.ballY - (agent.paddleY + PADDLE_HEIGHT / 2));
+  }
+
+  function inputsFor(agent) {
+    const paddleCenter = agent.paddleY + PADDLE_HEIGHT / 2;
+    return [
+      paddleCenter / HEIGHT,
+      agent.ballX / WIDTH,
+      agent.ballY / HEIGHT,
+      agent.ballVx / 9,
+      agent.ballVy / 9,
+      (agent.ballY - paddleCenter) / HEIGHT,
+    ];
+  }
+
+  function chooseAction(agent) {
+    const outputs = feedForward(agent.genome, inputsFor(agent));
+    return outputs.indexOf(Math.max(...outputs));
+  }
+
+  function applyPaddleAction(agent, action) {
+    if (action === 0) agent.paddleY -= PADDLE_SPEED;
+    if (action === 2) agent.paddleY += PADDLE_SPEED;
+    agent.paddleY = clamp(agent.paddleY, 18, HEIGHT - 18 - PADDLE_HEIGHT);
+  }
+
+  function updatePong(agent, action) {
+    if (!agent.alive) return;
+
+    applyPaddleAction(agent, action);
+    agent.ballX += agent.ballVx;
+    agent.ballY += agent.ballVy;
+    agent.age += 1;
+
+    if (agent.ballY - BALL_RADIUS < 18) {
+      agent.ballY = 18 + BALL_RADIUS;
+      agent.ballVy = Math.abs(agent.ballVy);
+    }
+    if (agent.ballY + BALL_RADIUS > HEIGHT - 18) {
+      agent.ballY = HEIGHT - 18 - BALL_RADIUS;
+      agent.ballVy = -Math.abs(agent.ballVy);
+    }
+    if (agent.ballX + BALL_RADIUS > WIDTH - 28) {
+      agent.ballX = WIDTH - 28 - BALL_RADIUS;
+      agent.ballVx = -Math.abs(agent.ballVx);
+    }
+
+    const paddleCenter = agent.paddleY + PADDLE_HEIGHT / 2;
+    const distance = Math.abs(agent.ballY - paddleCenter);
+    agent.fitness += 1 + Math.max(0, 1 - distance / 240) * 3;
+    if (distance < agent.lastDistance) agent.fitness += 2;
+    agent.lastDistance = distance;
+
+    const hitsPaddleX =
+      agent.ballVx < 0 &&
+      agent.ballX - BALL_RADIUS <= PADDLE_X + PADDLE_WIDTH &&
+      agent.ballX + BALL_RADIUS >= PADDLE_X;
+    const hitsPaddleY = agent.ballY >= agent.paddleY && agent.ballY <= agent.paddleY + PADDLE_HEIGHT;
+
+    if (hitsPaddleX && hitsPaddleY) {
+      const offset = (agent.ballY - paddleCenter) / (PADDLE_HEIGHT / 2);
+      agent.ballX = PADDLE_X + PADDLE_WIDTH + BALL_RADIUS;
+      agent.ballVx = Math.abs(agent.ballVx) + 0.18;
+      agent.ballVy = clamp(agent.ballVy + offset * 2.4, -7.2, 7.2);
+      agent.score += 1;
+      agent.fitness += 850 + agent.score * 120;
+    }
+
+    if (agent.ballX + BALL_RADIUS < 0) {
+      agent.alive = false;
+      agent.fitness -= 180 + distance;
+    }
+
+    if (agent.age >= MAX_RALLY_FRAMES) {
+      agent.alive = false;
+      agent.fitness += 500 + agent.score * 80;
+    }
+  }
+
+  function drawPong(targetCtx, agent, mode, currentScore) {
+    targetCtx.fillStyle = "#172026";
+    targetCtx.fillRect(0, 0, WIDTH, HEIGHT);
+
+    targetCtx.strokeStyle = "rgba(255,255,255,0.18)";
+    targetCtx.lineWidth = 3;
+    targetCtx.setLineDash([12, 16]);
+    targetCtx.beginPath();
+    targetCtx.moveTo(WIDTH / 2, 24);
+    targetCtx.lineTo(WIDTH / 2, HEIGHT - 24);
+    targetCtx.stroke();
+    targetCtx.setLineDash([]);
+
+    targetCtx.fillStyle = "#f7faf8";
+    targetCtx.fillRect(PADDLE_X, agent.paddleY, PADDLE_WIDTH, PADDLE_HEIGHT);
+    targetCtx.fillRect(WIDTH - 32, 24, 8, HEIGHT - 48);
+
+    targetCtx.fillStyle = "#f2c14e";
+    targetCtx.beginPath();
+    targetCtx.arc(agent.ballX, agent.ballY, BALL_RADIUS, 0, Math.PI * 2);
+    targetCtx.fill();
+
+    targetCtx.strokeStyle = "rgba(242,193,78,0.32)";
+    targetCtx.beginPath();
+    targetCtx.moveTo(PADDLE_X + PADDLE_WIDTH, agent.paddleY + PADDLE_HEIGHT / 2);
+    targetCtx.lineTo(agent.ballX, agent.ballY);
+    targetCtx.stroke();
+
+    drawScoreBadge(targetCtx, currentScore);
+    drawCrashOverlay(targetCtx, mode, agent, "Press an arrow key or Reset to play again");
+  }
+
+  return {
+    key: "pong",
+    title: "Pong",
+    objective: "Les agents apprennent a placer le paddle pour renvoyer la balle le plus longtemps possible.",
+    hint: "IA: un specimen joue un rally complet, puis le suivant est teste. Humain: fleches ou WASD.",
+    sequential: true,
+    defaultSpeed: 10,
+    maxSpeed: 40,
+    speedLabel: "Rally speed",
+    populationLabel: "Specimens",
+    leaderFitnessLabel: "Current specimen",
+    inputs: 6,
+    hidden: DEFAULT_HIDDEN,
+    outputs: 3,
+    inputLabels: PONG_INPUT_LABELS,
+    outputLabels: ["up", "stay", "down"],
+    outputLabel: "Paddle",
+    distanceLabel: "Ball distance",
+    championStorageKey: PONG_CHAMPION_STORAGE_KEY,
+    championStorageKeys: [PONG_CHAMPION_STORAGE_KEY],
+    defaultChampionStatus: "No Pong champion saved yet.",
+    humanNetworkMessage: "Switch to AI training to view the Pong network.",
+    createWorld() {
+      return { activeAgentIndex: 0 };
+    },
+    makeAgent(id, genome) {
+      return {
+        id,
+        genome,
+        alive: false,
+        fitness: 0,
+        score: 0,
+        age: 0,
+        paddleY: HEIGHT / 2 - PADDLE_HEIGHT / 2,
+        ballX: WIDTH * 0.68,
+        ballY: HEIGHT / 2,
+        ballVx: -BALL_SPEED,
+        ballVy: 0,
+        lastDistance: 0,
+      };
+    },
+    makeHumanAgent(id) {
+      return this.makeAgent(id, createGenome(this));
+    },
+    resetAgents(nextAgents, targetWorld) {
+      targetWorld.activeAgentIndex = 0;
+      for (const agent of nextAgents) {
+        agent.alive = false;
+        agent.fitness = 0;
+        agent.score = 0;
+        agent.age = 0;
+      }
+    },
+    startAgent(agent) {
+      resetPong(agent);
+    },
+    resetHuman(agent) {
+      resetPong(agent);
+    },
+    stepWorld() {},
+    updateAgent(agent) {
+      updatePong(agent, chooseAction(agent));
+    },
+    updateHuman(agent) {
+      if (!agent) return;
+      updatePong(agent, agent.pendingAction ?? 1);
+      agent.pendingAction = 1;
+    },
+    humanPrimaryAction() {},
+    handleHumanKey(event, agent) {
+      if (!agent) return false;
+      const actions = {
+        ArrowUp: 0,
+        KeyW: 0,
+        ArrowDown: 2,
+        KeyS: 2,
+      };
+      if (actions[event.code] === undefined) return false;
+      agent.pendingAction = actions[event.code];
+      return true;
+    },
+    distanceMetric(agent) {
+      if (!agent) return 0;
+      return Math.round(Math.abs(agent.ballY - (agent.paddleY + PADDLE_HEIGHT / 2)));
+    },
+    draw(targetCtx, targetWorld, visibleAgents, mode, currentScore) {
+      const agent = visibleAgents[0];
+      if (!agent) {
+        targetCtx.clearRect(0, 0, WIDTH, HEIGHT);
+        return;
+      }
+      drawPong(targetCtx, agent, mode, currentScore);
+    },
+  };
+}
+
 function drawScoreBadge(targetCtx, currentScore) {
   targetCtx.fillStyle = "rgba(255,255,255,0.82)";
   targetCtx.fillRect(18, 18, 168, 54);
@@ -1327,6 +1560,7 @@ ui.modeAi.addEventListener("click", () => setMode("ai"));
 ui.modeHuman.addEventListener("click", () => setMode("human"));
 ui.gamePipe.addEventListener("click", () => setGame("pipe"));
 ui.gameSnake.addEventListener("click", () => setGame("snake"));
+ui.gamePong.addEventListener("click", () => setGame("pong"));
 ui.speed.addEventListener("input", () => {
   ui.speedValue.textContent = `${ui.speed.value}x`;
   if (activeGameKey === "pipe") ui.preset.value = "custom";
