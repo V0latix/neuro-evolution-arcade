@@ -89,8 +89,9 @@ and champion storage keys.
   compatibility tests in sync.
 - Pipe gap and pipe spacing reset the current run so one generation is not
   scored across mixed difficulty settings.
-- Pong ball speed, paddle size, and rally duration reset the current Pong run
-  for the same reason.
+- Pong ball speed, paddle size, and return patience reset the current Pong run
+  for the same reason. Return patience is a no-return timeout, not a total
+  rally duration cap.
 - Saved Flappy Bird champions are stored in `localStorage` under the historical
   `neuro-evolution-arcade.pipe-runner.champion`.
 - The previous key `neuro-evolution-arcade.flappy.champion` and legacy key

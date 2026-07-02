@@ -445,16 +445,16 @@ test("Pong human mode uses arrow keys and keeps AI-only actions disabled", async
   assert.equal(element(harness, "activeGameTitle").textContent, "Pong");
 });
 
-test("seeded Pong model returns the first ball in AI mode", async () => {
+test("seeded Pong model can score multiple returns in AI mode", async () => {
   const originalRandom = Math.random;
   Math.random = () => 0.5;
 
   try {
     const harness = await loadHarness();
     element(harness, "gamePong").click();
-    harness.runFrame(30);
+    harness.runFrame(70);
 
-    assert.ok(Number(element(harness, "score").textContent) >= 1);
+    assert.ok(Number(element(harness, "score").textContent) >= 2);
     assert.ok(Number(element(harness, "leaderFitness").textContent) > 1000);
   } finally {
     Math.random = originalRandom;

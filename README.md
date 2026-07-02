@@ -26,7 +26,7 @@ The app currently runs entirely in the browser and includes:
 - Human play mode with the space bar for Flappy Bird and arrows/WASD for Pong
 - Local champion save/load via browser storage
 - Flappy Bird difficulty presets for gap, spacing, speed, and mutation
-- Pong-specific sliders for ball speed, paddle size, and rally duration
+- Pong-specific sliders for ball speed, paddle size, and return patience
 
 ## Game Modules
 
@@ -100,7 +100,8 @@ environment.
 - `Pong`: use arrows or WASD in human mode
 - `Vitesse balle`: change Pong ball speed
 - `Taille paddle`: change Pong paddle height
-- `Duree rally`: change the maximum Pong rally length
+- `Patience retour`: change how long a Pong specimen may go without returning
+  the ball. It does not cap the total rally score.
 - `Training speed`: in Pong, run more simulation steps per animation frame while
   still testing one specimen at a time
 - `Save` / `Load` / `Clear`: manage the best saved champion in local browser

@@ -975,7 +975,7 @@ function createPongGame() {
     return clamp(numberValue(ui.pongBallSpeed, 4.8), 3.8, 7.2);
   }
 
-  function rallyLimit() {
+  function returnPatience() {
     return clamp(Math.round(numberValue(ui.pongRallyLength, 1800)), 700, 2400);
   }
 
@@ -1041,6 +1041,7 @@ function createPongGame() {
     agent.fitness = 0;
     agent.score = 0;
     agent.age = 0;
+    agent.stepsSinceReturn = 0;
     agent.lastImpactDistance = Math.abs(predictedImpactY(agent) - (agent.paddleY + height / 2));
     agent.pendingAction = 1;
   }
@@ -1094,6 +1095,7 @@ function createPongGame() {
     agent.ballX += agent.ballVx;
     agent.ballY += agent.ballVy;
     agent.age += 1;
+    agent.stepsSinceReturn += 1;
 
     if (agent.ballY - BALL_RADIUS < TOP_WALL) {
       agent.ballY = TOP_WALL + BALL_RADIUS;
@@ -1138,6 +1140,7 @@ function createPongGame() {
       agent.ballVx = Math.min(Math.abs(agent.ballVx) + 0.14, ballSpeed() + 2.4);
       agent.ballVy = clamp(agent.ballVy + offset * 2.6, -8.2, 8.2);
       agent.score += 1;
+      agent.stepsSinceReturn = 0;
       agent.fitness += 1200 + agent.score * 180 + Math.max(0, 1 - Math.abs(offset)) * 180;
     }
 
@@ -1146,9 +1149,9 @@ function createPongGame() {
       agent.fitness -= 450 + impactDistance * 2;
     }
 
-    if (agent.age >= rallyLimit()) {
+    if (agent.stepsSinceReturn >= returnPatience()) {
       agent.alive = false;
-      agent.fitness += 700 + agent.score * 120;
+      agent.fitness -= 140 + impactDistance;
     }
   }
 
@@ -1235,6 +1238,7 @@ function createPongGame() {
         fitness: 0,
         score: 0,
         age: 0,
+        stepsSinceReturn: 0,
         paddleY: HEIGHT / 2 - paddleHeight() / 2,
         ballX: WIDTH * 0.68,
         ballY: HEIGHT / 2,
@@ -1254,6 +1258,7 @@ function createPongGame() {
         agent.fitness = 0;
         agent.score = 0;
         agent.age = 0;
+        agent.stepsSinceReturn = 0;
       }
     },
     startAgent(agent) {
