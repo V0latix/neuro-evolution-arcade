@@ -293,6 +293,8 @@ test("static app includes every primary control and asset reference", async () =
   assert.match(script, /inputs: 6/);
   assert.match(script, /inputs: 10/);
   assert.match(script, /PONG_INPUT_LABELS/);
+  assert.match(script, /createHamiltonianCycle/);
+  assert.match(script, /cycle food/);
   assert.match(script, /outputLabels: \["up", "right", "down", "left"\]/);
   assert.match(script, /outputLabels: \["up", "stay", "down"\]/);
   assert.match(script, /next gap/);
@@ -349,15 +351,15 @@ test("game picker switches to Snake with its own controls and network shape", as
   const networkCalls = element(harness, "network").getContext().calls;
   const labels = networkCalls.filter((call) => call.type === "fillText").map((call) => call.text);
   assert.deepEqual(labels.slice(0, 10), [
-    "danger U",
-    "danger R",
-    "danger D",
-    "danger L",
+    "unsafe U",
+    "unsafe R",
+    "unsafe D",
+    "unsafe L",
     "food x",
     "food y",
     "dir x",
     "dir y",
-    "stale",
+    "cycle food",
     "length",
   ]);
   assert.equal(labels.includes("up"), true);

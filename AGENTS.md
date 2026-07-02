@@ -81,6 +81,11 @@ and champion storage keys.
 - Snake uses sequential evaluation. Only one specimen is active at a time; when
   it dies, the next specimen starts a fresh Snake board. The generation evolves
   only after every specimen has been evaluated.
+- Snake uses a hybrid Hamiltonian-cycle strategy. The cycle is the safe fallback
+  route, while the neural network proposes shortcuts. Keep shortcut validation
+  conservative: a neural move must avoid collisions and preserve enough cycle
+  distance before the tail, otherwise the agent should follow the next cycle
+  cell.
 - Pong also uses sequential evaluation. Only one specimen rally is shown at a
   time, and the generation evolves after every specimen has played a rally.
 - Snake's right-side controls intentionally differ from Flappy Bird: the metric

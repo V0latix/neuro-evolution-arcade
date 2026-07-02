@@ -105,10 +105,9 @@
           <section id="explanationSnake" class="panel-section explanation is-hidden">
             <h2>Comment Snake apprend</h2>
             <p>
-              Chaque snake possede un reseau neuronal different. Le reseau observe les dangers
-              en haut, a droite, en bas et a gauche, la position de la nourriture, sa direction
-              actuelle, le nombre de pas sans progresser et sa longueur. Il choisit maintenant un
-              mouvement direct : haut, droite, bas ou gauche.
+              Chaque snake possede un reseau neuronal different, mais il n'est plus laisse seul
+              face au probleme. Un cycle hamiltonien traverse toute la grille et sert de chemin securise:
+              en le suivant, le snake finit toujours par atteindre la nourriture sans se bloquer.
             </p>
             <p>
               Une generation Snake est testee specimen par specimen. Le premier snake joue une
@@ -117,10 +116,11 @@
               Specimen indique cette progression.
             </p>
             <p>
-              La survie seule ne rapporte presque rien. Le fitness augmente surtout quand le snake
-              reduit sa meilleure distance a la nourriture et quand il mange. Les revisites de cases
-              et les periodes sans progresser sont fortement penalisees pour eviter qu'un specimen
-              tourne en rond. S'il touche un mur, son corps ou s'il stagne trop longtemps, il meurt.
+              Le reseau neuronal propose des raccourcis vers la nourriture. L'application accepte
+              seulement les raccourcis compatibles avec le cycle, c'est-a-dire ceux qui ne coupent
+              pas devant le corps et gardent assez d'espace avant la queue. Sinon, le snake suit le
+              prochain pas du cycle. Le fitness recompense surtout la nourriture mangee et les bons
+              raccourcis.
             </p>
             <p>
               A la fin d'une generation, les snakes les plus efficaces sont conserves. Les autres

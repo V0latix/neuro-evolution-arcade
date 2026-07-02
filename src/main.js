@@ -71,15 +71,15 @@ const PRESETS = {
 
 const PIPE_INPUT_LABELS = ["height", "velocity", "pipe x", "gap top", "gap bottom", "next gap"];
 const SNAKE_INPUT_LABELS = [
-  "danger U",
-  "danger R",
-  "danger D",
-  "danger L",
+  "unsafe U",
+  "unsafe R",
+  "unsafe D",
+  "unsafe L",
   "food x",
   "food y",
   "dir x",
   "dir y",
-  "stale",
+  "cycle food",
   "length",
 ];
 const PONG_INPUT_LABELS = ["paddle y", "ball x", "ball y", "ball vx", "ball vy", "target dy"];
@@ -960,6 +960,33 @@ function createSnakeGame() {
     return clamp(Math.round(numberValue(ui.snakePatience, 90)), 35, 220);
   }
 
+  function evenRows(cols) {
+    const preferred = Math.max(12, Math.round(cols * 0.66));
+    return preferred % 2 === 0 ? preferred : preferred + 1;
+  }
+
+  function createHamiltonianCycle(cols, rows) {
+    const cycle = [];
+    for (let x = 0; x < cols; x += 1) cycle.push({ x, y: 0 });
+
+    for (let y = 1; y < rows; y += 1) {
+      if (y % 2 === 1) {
+        for (let x = cols - 1; x >= 1; x -= 1) cycle.push({ x, y });
+      } else {
+        for (let x = 1; x < cols; x += 1) cycle.push({ x, y });
+      }
+    }
+
+    for (let y = rows - 1; y >= 1; y -= 1) cycle.push({ x: 0, y });
+
+    const index = new Map();
+    for (const [position, point] of cycle.entries()) {
+      index.set(`${point.x},${point.y}`, position);
+    }
+
+    return { cycle, index };
+  }
+
   function board(targetWorld) {
     const size = Math.floor(Math.min((WIDTH - 96) / targetWorld.cols, (HEIGHT - 96) / targetWorld.rows));
     const width = size * targetWorld.cols;
@@ -985,22 +1012,14 @@ function createSnakeGame() {
   }
 
   function resetSnake(agent, targetWorld) {
-    const centerX = Math.floor(targetWorld.cols / 2);
-    const centerY = Math.floor(targetWorld.rows / 2);
-    const directions = [
-      { x: 1, y: 0 },
-      { x: -1, y: 0 },
-      { x: 0, y: 1 },
-      { x: 0, y: -1 },
-    ];
-    const dir = directions[Math.floor(Math.random() * directions.length)];
-    agent.dir = { ...dir };
-    agent.pendingDir = { ...dir };
-    agent.body = [
-      { x: centerX, y: centerY },
-      { x: centerX - dir.x, y: centerY - dir.y },
-      { x: centerX - dir.x * 2, y: centerY - dir.y * 2 },
-    ];
+    const start = Math.floor(Math.random() * targetWorld.cycle.length);
+    const head = targetWorld.cycle[start];
+    const neck = targetWorld.cycle[(start - 1 + targetWorld.cycle.length) % targetWorld.cycle.length];
+    const tail = targetWorld.cycle[(start - 2 + targetWorld.cycle.length) % targetWorld.cycle.length];
+    const next = targetWorld.cycle[(start + 1) % targetWorld.cycle.length];
+    agent.dir = { x: next.x - head.x, y: next.y - head.y };
+    agent.pendingDir = { ...agent.dir };
+    agent.body = [{ ...head }, { ...neck }, { ...tail }];
     agent.food = randomFood(agent, targetWorld);
     agent.alive = true;
     agent.fitness = 0;
@@ -1009,8 +1028,8 @@ function createSnakeGame() {
     agent.stepsSinceFood = 0;
     agent.staleSteps = 0;
     agent.bestFoodDistance = manhattan(agent.body[0], agent.food);
-    agent.lastAction = 1;
-    agent.repeatedTurnCount = 0;
+    agent.shortcutCount = 0;
+    agent.followCount = 0;
     agent.visitCounts = new Map(agent.body.map((part) => [`${part.x},${part.y}`, 1]));
   }
 
@@ -1028,11 +1047,6 @@ function createSnakeGame() {
     };
   }
 
-  function hitsWallOrBody(point, agent, targetWorld) {
-    if (point.x < 0 || point.y < 0 || point.x >= targetWorld.cols || point.y >= targetWorld.rows) return true;
-    return agent.body.some((part, index) => index > 0 && part.x === point.x && part.y === point.y);
-  }
-
   function manhattan(a, b) {
     return Math.abs(a.x - b.x) + Math.abs(a.y - b.y);
   }
@@ -1041,52 +1055,119 @@ function createSnakeGame() {
     return a.x + b.x === 0 && a.y + b.y === 0;
   }
 
+  function keyFor(point) {
+    return `${point.x},${point.y}`;
+  }
+
+  function cycleIndex(targetWorld, point) {
+    return targetWorld.cycleIndex.get(keyFor(point));
+  }
+
+  function cycleDistance(targetWorld, fromIndex, toIndex) {
+    return (toIndex - fromIndex + targetWorld.cycle.length) % targetWorld.cycle.length;
+  }
+
+  function directionToAction(direction) {
+    return DIRECTIONS.findIndex((candidate) => candidate.x === direction.x && candidate.y === direction.y);
+  }
+
+  function hamiltonianAction(agent, targetWorld) {
+    const headIndex = cycleIndex(targetWorld, agent.body[0]);
+    const nextPoint = targetWorld.cycle[(headIndex + 1) % targetWorld.cycle.length];
+    return directionToAction({
+      x: nextPoint.x - agent.body[0].x,
+      y: nextPoint.y - agent.body[0].y,
+    });
+  }
+
+  function isCycleSafeMove(agent, targetWorld, direction) {
+    if (isReverse(direction, agent.dir)) return false;
+    const head = agent.body[0];
+    const target = { x: head.x + direction.x, y: head.y + direction.y };
+    if (target.x < 0 || target.y < 0 || target.x >= targetWorld.cols || target.y >= targetWorld.rows) return false;
+
+    const targetKey = keyFor(target);
+    const tailKey = keyFor(agent.body[agent.body.length - 1]);
+    const willEat = target.x === agent.food.x && target.y === agent.food.y;
+    const hitsBody = agent.body.some((part, index) => index > 0 && keyFor(part) === targetKey);
+    if (hitsBody && (willEat || targetKey !== tailKey)) return false;
+
+    const headIndex = cycleIndex(targetWorld, head);
+    const targetIndex = cycleIndex(targetWorld, target);
+    const tailIndex = cycleIndex(targetWorld, agent.body[agent.body.length - 1]);
+    const targetDistance = cycleDistance(targetWorld, headIndex, targetIndex);
+    const tailDistance = cycleDistance(targetWorld, headIndex, tailIndex);
+    if (targetDistance === 0) return false;
+    if (targetDistance === 1) return true;
+
+    const reservedTailGap = Math.max(3, Math.min(12, agent.body.length + 1));
+    return targetDistance < Math.max(2, tailDistance - reservedTailGap);
+  }
+
   function inputsFor(agent, targetWorld) {
     const head = agent.body[0];
+    const headIndex = cycleIndex(targetWorld, head);
+    const foodIndex = cycleIndex(targetWorld, agent.food);
     return [
-      hitsWallOrBody(nextHead(agent, DIRECTIONS[0]), agent, targetWorld) ? 1 : 0,
-      hitsWallOrBody(nextHead(agent, DIRECTIONS[1]), agent, targetWorld) ? 1 : 0,
-      hitsWallOrBody(nextHead(agent, DIRECTIONS[2]), agent, targetWorld) ? 1 : 0,
-      hitsWallOrBody(nextHead(agent, DIRECTIONS[3]), agent, targetWorld) ? 1 : 0,
+      isCycleSafeMove(agent, targetWorld, DIRECTIONS[0]) ? 0 : 1,
+      isCycleSafeMove(agent, targetWorld, DIRECTIONS[1]) ? 0 : 1,
+      isCycleSafeMove(agent, targetWorld, DIRECTIONS[2]) ? 0 : 1,
+      isCycleSafeMove(agent, targetWorld, DIRECTIONS[3]) ? 0 : 1,
       (agent.food.x - head.x) / targetWorld.cols,
       (agent.food.y - head.y) / targetWorld.rows,
       agent.dir.x,
       agent.dir.y,
-      agent.staleSteps / patienceLimit(),
+      cycleDistance(targetWorld, headIndex, foodIndex) / targetWorld.cycle.length,
       agent.body.length / (targetWorld.cols * targetWorld.rows),
     ];
   }
 
   function chooseAction(agent, targetWorld) {
     const outputs = feedForward(agent.genome, inputsFor(agent, targetWorld));
-    return outputs
+    const hamiltonian = hamiltonianAction(agent, targetWorld);
+    const choice = outputs
       .map((value, index) => ({ index, value }))
       .sort((a, b) => b.value - a.value)
-      .find((choice) => !isReverse(DIRECTIONS[choice.index], agent.dir))?.index ?? 1;
+      .find((candidate) => isCycleSafeMove(agent, targetWorld, DIRECTIONS[candidate.index]));
+
+    return {
+      action: choice?.index ?? hamiltonian,
+      usedShortcut: choice !== undefined && choice.index !== hamiltonian,
+    };
   }
 
-  function updateSnake(agent, targetWorld, action = null) {
+  function updateSnake(agent, targetWorld, decision = null) {
     if (!agent.alive) return;
 
+    const hamiltonian = hamiltonianAction(agent, targetWorld);
+    const action = typeof decision === "number" ? decision : decision?.action ?? hamiltonian;
+    const usedShortcut = Boolean(decision?.usedShortcut);
     const previousDistance = manhattan(agent.body[0], agent.food);
-    if (action !== null) {
-      const nextDirection = DIRECTIONS[action] || DIRECTIONS[1];
-      if (!isReverse(nextDirection, agent.dir)) agent.dir = { x: nextDirection.x, y: nextDirection.y };
-    }
+    const nextDirection = DIRECTIONS[action] || DIRECTIONS[hamiltonian] || DIRECTIONS[1];
+    agent.dir = { x: nextDirection.x, y: nextDirection.y };
 
     const head = nextHead(agent);
     agent.age += 1;
     agent.stepsSinceFood += 1;
     agent.staleSteps += 1;
+    agent.fitness += 0.25;
+    agent.followCount += usedShortcut ? 0 : 1;
+    agent.shortcutCount += usedShortcut ? 1 : 0;
+    if (usedShortcut) agent.fitness += 5;
 
-    if (hitsWallOrBody(head, agent, targetWorld)) {
+    const willEat = head.x === agent.food.x && head.y === agent.food.y;
+    const headKey = keyFor(head);
+    const tailKey = keyFor(agent.body[agent.body.length - 1]);
+    const outOfBounds = head.x < 0 || head.y < 0 || head.x >= targetWorld.cols || head.y >= targetWorld.rows;
+    const hitsBody = agent.body.some((part, index) => index > 0 && keyFor(part) === headKey);
+    if (outOfBounds || (hitsBody && (willEat || headKey !== tailKey))) {
       agent.alive = false;
-      agent.fitness -= 140;
+      agent.fitness -= 300;
       return;
     }
 
     agent.body.unshift(head);
-    if (head.x === agent.food.x && head.y === agent.food.y) {
+    if (willEat) {
       agent.score += 1;
       agent.stepsSinceFood = 0;
       agent.staleSteps = 0;
@@ -1107,18 +1188,18 @@ function createSnakeGame() {
       }
     }
 
-    const key = `${head.x},${head.y}`;
+    const key = keyFor(head);
     const visitCount = (agent.visitCounts.get(key) || 0) + 1;
     agent.visitCounts.set(key, visitCount);
     if (visitCount > 1) {
-      agent.fitness -= visitCount * 35;
-      agent.staleSteps += visitCount * 2;
-      agent.stepsSinceFood += visitCount * 2;
+      agent.fitness -= visitCount * 12;
     }
 
-    if (agent.staleSteps > patienceLimit() || agent.stepsSinceFood > patienceLimit() * 2) {
+    const maxRun = targetWorld.cycle.length * 2 + agent.score * Math.floor(targetWorld.cycle.length * 0.35);
+    const maxIdle = Math.max(Math.floor(targetWorld.cycle.length * 0.5), patienceLimit() * 3);
+    if (agent.age > maxRun || agent.stepsSinceFood > maxIdle) {
       agent.alive = false;
-      agent.fitness -= 90;
+      agent.fitness -= 40;
     }
   }
 
@@ -1131,6 +1212,22 @@ function createSnakeGame() {
     const targetBoard = board(targetWorld);
     targetCtx.save();
     targetCtx.globalAlpha = alpha;
+
+    targetCtx.strokeStyle = "rgba(36, 123, 160, 0.18)";
+    targetCtx.lineWidth = 1;
+    targetCtx.beginPath();
+    for (const [index, point] of targetWorld.cycle.entries()) {
+      const x = targetBoard.x + point.x * targetBoard.cell + targetBoard.cell / 2;
+      const y = targetBoard.y + point.y * targetBoard.cell + targetBoard.cell / 2;
+      if (index === 0) targetCtx.moveTo(x, y);
+      else targetCtx.lineTo(x, y);
+    }
+    const first = targetWorld.cycle[0];
+    targetCtx.lineTo(
+      targetBoard.x + first.x * targetBoard.cell + targetBoard.cell / 2,
+      targetBoard.y + first.y * targetBoard.cell + targetBoard.cell / 2,
+    );
+    targetCtx.stroke();
 
     for (const [index, part] of agent.body.entries()) {
       const x = targetBoard.x + part.x * targetBoard.cell;
@@ -1155,8 +1252,8 @@ function createSnakeGame() {
   return {
     key: "snake",
     title: "Snake",
-    objective: "Les agents apprennent a rejoindre la nourriture vite, sans heurter les murs ni revisiter les memes cases.",
-    hint: "IA: un specimen joue sa partie complete, puis le suivant est teste. Humain: fleches ou WASD.",
+    objective: "Les agents suivent un cycle hamiltonien securise et apprennent quand prendre des raccourcis vers la nourriture.",
+    hint: "IA: le cycle garantit un chemin securise; le reseau propose seulement des raccourcis valides. Humain: fleches ou WASD.",
     sequential: true,
     defaultSpeed: 18,
     maxSpeed: 60,
@@ -1176,7 +1273,9 @@ function createSnakeGame() {
     humanNetworkMessage: "Switch to AI training to view the snake network.",
     createWorld() {
       const cols = gridSize();
-      return { cols, rows: Math.max(12, Math.round(cols * 0.66)), activeAgentIndex: 0 };
+      const rows = evenRows(cols);
+      const { cycle, index } = createHamiltonianCycle(cols, rows);
+      return { cols, rows, cycle, cycleIndex: index, activeAgentIndex: 0 };
     },
     makeAgent(id, genome) {
       return {
@@ -1189,6 +1288,8 @@ function createSnakeGame() {
         stepsSinceFood: 0,
         staleSteps: 0,
         bestFoodDistance: 0,
+        shortcutCount: 0,
+        followCount: 0,
         body: [],
         food: { x: 0, y: 0 },
         dir: { x: 1, y: 0 },
@@ -1236,8 +1337,7 @@ function createSnakeGame() {
     },
     updateHuman(agent, targetWorld) {
       if (!agent) return;
-      agent.dir = { ...agent.pendingDir };
-      updateSnake(agent, targetWorld);
+      updateSnake(agent, targetWorld, directionToAction(agent.pendingDir));
     },
     humanPrimaryAction() {},
     handleHumanKey(event, agent) {

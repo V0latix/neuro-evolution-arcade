@@ -20,7 +20,8 @@ The app currently runs entirely in the browser and includes:
 - Generation-by-generation training
 - Live metrics and a neural-network visualizer for the current champion
 - Flappy Bird with six inputs, including the following pipe gap
-- Snake with ten inputs and four direct actions: up, right, down, left
+- Snake with ten inputs, a Hamiltonian safety cycle, and four neural shortcut
+  actions: up, right, down, left
 - Sequential Snake evaluation: one specimen plays a full run, then the next
   specimen starts its own run
 - Pong with six inputs and three paddle actions: up, stay, down
@@ -38,13 +39,15 @@ The app currently runs entirely in the browser and includes:
 velocity, obstacle distance, the current gap, and the next gap. The output is a
 single flap decision.
 
-`Snake` trains grid agents. The network observes danger in the four absolute
-directions, food position, current direction, stale progress, and length. The
-outputs select one of four direct moves: up, right, down, or left. Snake
-specimens are evaluated one at a time so each agent gets a separate board, food
-sequence, and fitness score. The fitness function now prioritizes reaching food
-over simply staying alive, with strong penalties for revisiting cells or going
-too long without improving the distance to food.
+`Snake` trains grid agents with a hybrid method. A Hamiltonian cycle covers the
+whole board and gives every snake a safe fallback route: if it keeps following
+the cycle, it will eventually reach food without trapping itself. The neural
+network does not replace that route; it proposes shortcuts. A shortcut is only
+accepted when it avoids walls and body collisions and still leaves enough cycle
+distance before the tail. Otherwise the snake follows the next Hamiltonian step.
+The network observes unsafe absolute moves, food position, current direction,
+cycle distance to the food, and length. Snake specimens are evaluated one at a
+time so each agent gets a separate board, food sequence, and fitness score.
 
 `Pong` trains paddle agents. The network observes the paddle position, ball
 position, ball velocity, and vertical distance from the paddle target. The
