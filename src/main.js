@@ -1529,6 +1529,9 @@ function createHillClimbGame() {
   const WHEEL_BASE = 86;
   const HILL_GRAVITY = 0.34;
   const HILL_GRAVITY_ROLL = 0.18;
+  const HILL_MASS = 1.55;
+  const HILL_ROTATIONAL_INERTIA = 2.8;
+  const HILL_MAX_SPIN = 0.105;
   const HILL_SUBSTEPS = 3;
   const MAX_FUEL = 1200;
   const START_X = 120;
@@ -1539,6 +1542,7 @@ function createHillClimbGame() {
     6460, 7040, 7600, 8450, 9100, 9900, 10600, 11400, 12200, 13050, 13800, 14600, 15400,
     16250, 17100, 18100, 19100, 20200, 21200, 21850,
   ];
+  const COIN_LIFTS = [58, 42, 50];
   const FUEL_X = [1050, 2180, 3420, 4920, 6420, 7420, 9000, 10800, 12800, 15000, 17300, 19600, 21400];
 
   function smoothstep(value) {
@@ -1565,7 +1569,7 @@ function createHillClimbGame() {
   function createCoins() {
     return COIN_X.map((x, index) => {
       const ground = terrainAt(x);
-      const lift = index % 3 === 0 ? 96 : index % 3 === 1 ? 66 : 82;
+      const lift = COIN_LIFTS[index % COIN_LIFTS.length];
       return { id: index, x, y: ground.y - lift };
     });
   }
@@ -1672,9 +1676,11 @@ function createHillClimbGame() {
   }
 
   function applyForce(agent, point, forceX, forceY, scale = 1) {
-    agent.vx += forceX * scale;
-    agent.vy += forceY * scale;
-    agent.angularVelocity += (point.relX * forceY - point.relY * forceX) * 0.00055 * scale;
+    const linearScale = scale / HILL_MASS;
+    agent.vx += forceX * linearScale;
+    agent.vy += forceY * linearScale;
+    agent.angularVelocity +=
+      ((point.relX * forceY - point.relY * forceX) * 0.00055 * scale) / HILL_ROTATIONAL_INERTIA;
   }
 
   function slopeGravityForce(ground) {
@@ -1693,18 +1699,18 @@ function createHillClimbGame() {
     const velocity = pointVelocity(agent, wheel);
     const normalVelocity = velocity.x * normal.x + velocity.y * normal.y;
     const tangentVelocity = velocity.x * tangent.x + velocity.y * tangent.y;
-    const suspension = Math.max(0, penetration * 0.12 - normalVelocity * 0.08);
+    const suspension = Math.max(0, penetration * 0.18 - normalVelocity * 0.1);
 
     applyForce(agent, wheel, normal.x * suspension, normal.y * suspension);
 
     const rollForce = slopeGravityForce(ground);
     applyForce(agent, wheel, tangent.x * rollForce, tangent.y * rollForce);
 
-    const grip = clamp(-tangentVelocity * 0.028, -0.08, 0.08);
+    const grip = clamp(-tangentVelocity * 0.034, -0.075, 0.075);
     applyForce(agent, wheel, tangent.x * grip, tangent.y * grip);
 
-    if (action.gas && agent.fuel > 0) {
-      const traction = side < 0 ? 0.11 : 0.075;
+    if (action.gas && side < 0 && agent.fuel > 0) {
+      const traction = 0.145;
       applyForce(agent, wheel, tangent.x * traction, tangent.y * traction);
     }
 
@@ -1801,14 +1807,15 @@ function createHillClimbGame() {
 
       const grounded = rearContact || frontContact;
       const tilt = effectiveAction.left ? -1 : effectiveAction.right ? 1 : 0;
-      agent.angularVelocity += tilt * (grounded ? 0.0022 : 0.008);
+      agent.angularVelocity += tilt * (grounded ? 0.0012 : 0.0038);
+      agent.angularVelocity = clamp(agent.angularVelocity, -HILL_MAX_SPIN, HILL_MAX_SPIN);
 
       agent.x += agent.vx / HILL_SUBSTEPS;
       agent.y += agent.vy / HILL_SUBSTEPS;
       agent.angle += agent.angularVelocity / HILL_SUBSTEPS;
       agent.vx *= grounded ? 0.998 : 0.999;
       agent.vy *= 0.999;
-      agent.angularVelocity *= grounded ? 0.988 : 0.994;
+      agent.angularVelocity *= grounded ? 0.982 : 0.988;
     }
 
     settleChassis(agent);

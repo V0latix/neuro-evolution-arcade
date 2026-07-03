@@ -332,9 +332,15 @@ test("static app includes every primary control and asset reference", async () =
   assert.match(script, /const CHASSIS_WIDTH = 98/);
   assert.match(script, /const CHASSIS_HEIGHT = 36/);
   assert.match(script, /const WHEEL_BASE = 86/);
+  assert.match(script, /const HILL_MASS = 1\.55/);
+  assert.match(script, /const HILL_ROTATIONAL_INERTIA = 2\.8/);
+  assert.match(script, /const HILL_MAX_SPIN = 0\.105/);
+  assert.match(script, /const COIN_LIFTS = \[58, 42, 50\]/);
   assert.match(script, /const HILL_GRAVITY_ROLL = 0\.18/);
   assert.match(script, /function slopeGravityForce\(ground\)/);
   assert.match(script, /applyForce\(agent, wheel, tangent\.x \* rollForce, tangent\.y \* rollForce\)/);
+  assert.match(script, /if \(action\.gas && side < 0 && agent\.fuel > 0\)/);
+  assert.doesNotMatch(script, /side < 0 \? 0\.11 : 0\.075/);
   assert.match(script, /\{ x: 22000, y: 300 \}/);
   assert.match(script, /21400/);
   assert.match(script, /function chassisCollisionPoints\(agent\)/);
