@@ -1523,26 +1523,20 @@ function createHillClimbGame() {
     { x: 21400, y: 470 },
     { x: 22000, y: 300 },
   ];
-  const CHASSIS_WIDTH = 98;
-  const CHASSIS_HEIGHT = 36;
-  const WHEEL_RADIUS = 14;
-  const WHEEL_BASE = 86;
+  const CHASSIS_WIDTH = 112;
+  const CHASSIS_HEIGHT = 34;
+  const WHEEL_RADIUS = 16;
+  const WHEEL_BASE = 96;
   const HILL_GRAVITY = 0.34;
-  const HILL_GRAVITY_ROLL = 0.18;
-  const HILL_MASS = 1.55;
-  const HILL_ROTATIONAL_INERTIA = 5.4;
-  const HILL_MAX_SPIN = 0.052;
-  const HILL_GROUND_TILT = 0.00025;
-  const HILL_AIR_TILT = 0.00145;
-  const HILL_PITCH_STABILITY = 0.018;
-  const HILL_PITCH_DAMPING = 0.88;
+  const HILL_MAX_SPIN = 0.045;
+  const HILL_GROUND_TILT = 0.00018;
+  const HILL_AIR_TILT = 0.0018;
+  const HILL_MOTOR_FORCE = 0.19;
+  const WHEEL_BASE_STIFFNESS = 0.42;
+  const CHASSIS_ANGLE_FOLLOW = 0.11;
+  const CHASSIS_BODY_LIFT = 44;
   const HILL_SUBSTEPS = 3;
-  const SUSPENSION_REST_LENGTH = 42;
-  const SUSPENSION_TRAVEL = 28;
-  const SUSPENSION_STIFFNESS = 0.036;
-  const SUSPENSION_DAMPING = 0.34;
-  const SUSPENSION_FORCE_LIMIT = 1.15;
-  const ANTI_ROLL_STRENGTH = 0.0025;
+  const SUSPENSION_REST_LENGTH = 46;
   const MAX_FUEL = 1200;
   const START_X = 120;
   const START_Y_OFFSET = 76;
@@ -1602,19 +1596,35 @@ function createHillClimbGame() {
     };
   }
 
-  function suspensionWheel(agent, side) {
-    const localX = side * WHEEL_BASE * 0.5;
-    const mount = localPoint(agent, localX, CHASSIS_HEIGHT * 0.02);
-    const rest = localPoint(agent, localX, CHASSIS_HEIGHT * 0.02 + SUSPENSION_REST_LENGTH);
-    const ground = terrainAt(rest.x);
-    const rawCompression = rest.y + WHEEL_RADIUS - ground.y;
-    const compression = clamp(rawCompression, 0, SUSPENSION_TRAVEL);
-    const wheel = localPoint(agent, localX, CHASSIS_HEIGHT * 0.02 + SUSPENSION_REST_LENGTH - compression);
-    return { mount, wheel, ground, compression, hasContact: rawCompression > 0 };
+  function makeWheel(x) {
+    const ground = terrainAt(x);
+    return {
+      x,
+      y: ground.y - WHEEL_RADIUS,
+      vx: 0,
+      vy: 0,
+      contact: true,
+    };
   }
 
   function wheelPoint(agent, side) {
-    return suspensionWheel(agent, side).wheel;
+    const wheel = side < 0 ? agent.rearWheel : agent.frontWheel;
+    return {
+      x: wheel.x,
+      y: wheel.y,
+      relX: wheel.x - agent.x,
+      relY: wheel.y - agent.y,
+      contact: wheel.contact,
+    };
+  }
+
+  function suspensionWheel(agent, side) {
+    const localX = side * WHEEL_BASE * 0.42;
+    const mount = localPoint(agent, localX, CHASSIS_HEIGHT * 0.22);
+    const wheel = wheelPoint(agent, side);
+    const length = Math.hypot(wheel.x - mount.x, wheel.y - mount.y);
+    const compression = clamp(SUSPENSION_REST_LENGTH - length, 0, SUSPENSION_REST_LENGTH);
+    return { mount, wheel, compression, hasContact: wheel.contact };
   }
 
   function normalizeAngle(angle) {
@@ -1632,6 +1642,8 @@ function createHillClimbGame() {
     agent.vy = 0;
     agent.angle = -Math.atan(start.slope) * 0.35;
     agent.angularVelocity = 0;
+    agent.rearWheel = makeWheel(START_X - WHEEL_BASE * 0.5);
+    agent.frontWheel = makeWheel(START_X + WHEEL_BASE * 0.5);
     agent.alive = true;
     agent.fitness = 0;
     agent.score = 0;
@@ -1689,70 +1701,84 @@ function createHillClimbGame() {
     };
   }
 
-  function pointVelocity(agent, point) {
-    return {
-      x: agent.vx - agent.angularVelocity * point.relY,
-      y: agent.vy + agent.angularVelocity * point.relX,
-    };
+  function wheelTangentialGravity(ground) {
+    const length = Math.hypot(ground.slope, 1) || 1;
+    return clamp((HILL_GRAVITY * ground.slope) / length, -0.13, 0.13);
   }
 
-  function applyForce(agent, point, forceX, forceY, scale = 1) {
-    const linearScale = scale / HILL_MASS;
-    agent.vx += forceX * linearScale;
-    agent.vy += forceY * linearScale;
-    agent.angularVelocity +=
-      ((point.relX * forceY - point.relY * forceX) * 0.00055 * scale) / HILL_ROTATIONAL_INERTIA;
-  }
+  function integrateWheel(agent, wheel, side, action, dt) {
+    const ground = terrainAt(wheel.x);
+    const tangentLength = Math.hypot(ground.slope, 1) || 1;
+    const tangent = { x: 1 / tangentLength, y: ground.slope / tangentLength };
+    let tangentSpeed = wheel.vx * tangent.x + wheel.vy * tangent.y;
 
-  function slopeGravityForce(ground) {
-    return clamp(HILL_GRAVITY * ground.slope * HILL_GRAVITY_ROLL, -0.065, 0.065);
-  }
-
-  function applyWheel(agent, side, action, contact) {
-    const { wheel, ground, compression, hasContact } = contact;
-    if (!hasContact) return false;
-    const normalLength = Math.hypot(ground.slope, 1) || 1;
-    const normal = { x: -ground.slope / normalLength, y: -1 / normalLength };
-    const tangent = { x: 1 / normalLength, y: ground.slope / normalLength };
-    const velocity = pointVelocity(agent, wheel);
-    const normalVelocity = velocity.x * normal.x + velocity.y * normal.y;
-    const tangentVelocity = velocity.x * tangent.x + velocity.y * tangent.y;
-    const springForce = clamp(
-      compression * SUSPENSION_STIFFNESS - Math.min(normalVelocity, 0) * SUSPENSION_DAMPING,
-      0,
-      SUSPENSION_FORCE_LIMIT,
-    );
-
-    applyForce(agent, wheel, normal.x * springForce, normal.y * springForce);
-
-    const rollForce = slopeGravityForce(ground);
-    applyForce(agent, wheel, tangent.x * rollForce, tangent.y * rollForce);
-
-    const grip = clamp(-tangentVelocity * 0.034, -0.075, 0.075);
-    applyForce(agent, wheel, tangent.x * grip, tangent.y * grip);
-
-    if (action.gas && side < 0 && agent.fuel > 0) {
-      const traction = 0.145;
-      applyForce(agent, wheel, tangent.x * traction, tangent.y * traction);
+    if (wheel.contact) {
+      tangentSpeed += wheelTangentialGravity(ground) * dt;
+      if (side < 0 && action.gas && agent.fuel > 0 && wheel.contact) {
+        tangentSpeed += HILL_MOTOR_FORCE * dt;
+      }
+      tangentSpeed = clamp(tangentSpeed, -5.2, 8.4) * 0.996;
+      wheel.vx = tangent.x * tangentSpeed;
+      wheel.vy = tangent.y * tangentSpeed;
+    } else {
+      wheel.vy += HILL_GRAVITY * dt;
+      wheel.vx *= 0.999;
     }
 
-    return true;
+    wheel.x += wheel.vx * dt;
+    wheel.y += wheel.vy * dt;
+
+    const nextGround = terrainAt(wheel.x);
+    if (wheel.y + WHEEL_RADIUS >= nextGround.y) {
+      const nextLength = Math.hypot(nextGround.slope, 1) || 1;
+      const nextTangent = { x: 1 / nextLength, y: nextGround.slope / nextLength };
+      const landingSpeed = wheel.vx * nextTangent.x + wheel.vy * nextTangent.y;
+      wheel.x = Math.max(START_X - 120, wheel.x);
+      wheel.y = nextGround.y - WHEEL_RADIUS;
+      wheel.vx = nextTangent.x * landingSpeed * 0.985;
+      wheel.vy = nextTangent.y * landingSpeed * 0.985;
+      wheel.contact = true;
+    } else {
+      wheel.contact = false;
+    }
   }
 
-  function applyAntiRoll(agent, rear, front) {
-    if (!rear.hasContact || !front.hasContact) return;
-    const difference = rear.compression - front.compression;
-    if (Math.abs(difference) < 0.5) return;
-    const torque = clamp(difference * ANTI_ROLL_STRENGTH, -0.025, 0.025);
-    agent.angularVelocity -= torque / HILL_ROTATIONAL_INERTIA;
+  function enforceWheelBase(agent) {
+    const dx = agent.frontWheel.x - agent.rearWheel.x;
+    const dy = agent.frontWheel.y - agent.rearWheel.y;
+    const distance = Math.hypot(dx, dy) || WHEEL_BASE;
+    const correction = ((distance - WHEEL_BASE) / distance) * WHEEL_BASE_STIFFNESS;
+    const adjustX = dx * correction * 0.5;
+    const adjustY = dy * correction * 0.5;
+    agent.rearWheel.x += adjustX;
+    agent.rearWheel.y += adjustY;
+    agent.frontWheel.x -= adjustX;
+    agent.frontWheel.y -= adjustY;
   }
 
-  function applyPitchStability(agent, rear, front) {
-    if (!rear.hasContact || !front.hasContact) return;
-    const wheelPitch = Math.atan2(front.wheel.y - rear.wheel.y, front.wheel.x - rear.wheel.x);
-    const pitchError = normalizeAngle(agent.angle - wheelPitch);
-    agent.angularVelocity -= pitchError * HILL_PITCH_STABILITY;
-    agent.angularVelocity *= HILL_PITCH_DAMPING;
+  function alignChassisToWheels(agent, action, dt) {
+    const rear = agent.rearWheel;
+    const front = agent.frontWheel;
+    const wheelAngle = Math.atan2(front.y - rear.y, front.x - rear.x);
+    const midpointX = (rear.x + front.x) * 0.5;
+    const midpointY = (rear.y + front.y) * 0.5;
+    const targetX = midpointX - Math.sin(wheelAngle) * CHASSIS_BODY_LIFT;
+    const targetY = midpointY - Math.cos(wheelAngle) * CHASSIS_BODY_LIFT;
+    const grounded = rear.contact || front.contact;
+    const tilt = action.left ? -1 : action.right ? 1 : 0;
+
+    agent.vx = (rear.vx + front.vx) * 0.5;
+    agent.vy += (targetY - agent.y) * (grounded ? 0.22 : 0.08);
+    agent.vy *= grounded ? 0.72 : 0.985;
+    agent.x += (targetX - agent.x) * (grounded ? 0.8 : 0.3);
+    agent.y += agent.vy * dt;
+    agent.y += (targetY - agent.y) * (grounded ? 0.34 : 0.12);
+
+    agent.angularVelocity += normalizeAngle(wheelAngle - agent.angle) * (grounded ? CHASSIS_ANGLE_FOLLOW : 0.025);
+    agent.angularVelocity += tilt * (grounded ? HILL_GROUND_TILT : HILL_AIR_TILT);
+    agent.angularVelocity = clamp(agent.angularVelocity, -HILL_MAX_SPIN, HILL_MAX_SPIN);
+    agent.angle += agent.angularVelocity * dt;
+    agent.angularVelocity *= grounded ? 0.78 : 0.985;
   }
 
   function chassisCollisionPoints(agent) {
@@ -1837,27 +1863,13 @@ function createHillClimbGame() {
     agent.rearContact = false;
 
     for (let i = 0; i < HILL_SUBSTEPS; i += 1) {
-      agent.vy += HILL_GRAVITY / HILL_SUBSTEPS;
-      const rear = suspensionWheel(agent, -1);
-      const front = suspensionWheel(agent, 1);
-      const rearContact = applyWheel(agent, -1, effectiveAction, rear);
-      const frontContact = applyWheel(agent, 1, effectiveAction, front);
-      applyAntiRoll(agent, rear, front);
-      applyPitchStability(agent, rear, front);
-      agent.rearContact = agent.rearContact || rearContact;
-      agent.frontContact = agent.frontContact || frontContact;
-
-      const grounded = rearContact || frontContact;
-      const tilt = effectiveAction.left ? -1 : effectiveAction.right ? 1 : 0;
-      agent.angularVelocity += tilt * (grounded ? HILL_GROUND_TILT : HILL_AIR_TILT);
-      agent.angularVelocity = clamp(agent.angularVelocity, -HILL_MAX_SPIN, HILL_MAX_SPIN);
-
-      agent.x += agent.vx / HILL_SUBSTEPS;
-      agent.y += agent.vy / HILL_SUBSTEPS;
-      agent.angle += agent.angularVelocity / HILL_SUBSTEPS;
-      agent.vx *= grounded ? 0.998 : 0.999;
-      agent.vy *= 0.999;
-      agent.angularVelocity *= grounded ? 0.982 : 0.988;
+      const dt = 1 / HILL_SUBSTEPS;
+      integrateWheel(agent, agent.rearWheel, -1, effectiveAction, dt);
+      integrateWheel(agent, agent.frontWheel, 1, effectiveAction, dt);
+      enforceWheelBase(agent);
+      alignChassisToWheels(agent, effectiveAction, dt);
+      agent.rearContact = agent.rearContact || agent.rearWheel.contact;
+      agent.frontContact = agent.frontContact || agent.frontWheel.contact;
     }
 
     settleChassis(agent);
@@ -1981,6 +1993,29 @@ function createHillClimbGame() {
     }
   }
 
+  function drawRollCage(targetCtx) {
+    targetCtx.strokeStyle = "#172026";
+    targetCtx.lineWidth = 4;
+    targetCtx.beginPath();
+    targetCtx.moveTo(-CHASSIS_WIDTH * 0.18, -CHASSIS_HEIGHT * 0.62);
+    targetCtx.lineTo(CHASSIS_WIDTH * 0.02, -CHASSIS_HEIGHT * 1.08);
+    targetCtx.lineTo(CHASSIS_WIDTH * 0.32, -CHASSIS_HEIGHT * 0.58);
+    targetCtx.stroke();
+  }
+
+  function drawDriver(targetCtx) {
+    targetCtx.fillStyle = "#f4c28f";
+    targetCtx.strokeStyle = "#172026";
+    targetCtx.lineWidth = 2;
+    targetCtx.beginPath();
+    targetCtx.arc(CHASSIS_WIDTH * 0.08, -CHASSIS_HEIGHT * 0.82, 9, 0, Math.PI * 2);
+    targetCtx.fill();
+    targetCtx.stroke();
+    targetCtx.fillStyle = "#f2c14e";
+    targetCtx.fillRect(CHASSIS_WIDTH * 0.01, -CHASSIS_HEIGHT * 1.02, 18, 8);
+    targetCtx.strokeRect(CHASSIS_WIDTH * 0.01, -CHASSIS_HEIGHT * 1.02, 18, 8);
+  }
+
   function drawVehicle(targetCtx, agent, cameraX) {
     const screenX = agent.x - cameraX;
     const rear = suspensionWheel(agent, -1);
@@ -2018,30 +2053,34 @@ function createHillClimbGame() {
     targetCtx.save();
     targetCtx.translate(screenX, agent.y);
     targetCtx.rotate(agent.angle);
-    targetCtx.fillStyle = "#247ba0";
+    targetCtx.fillStyle = "#d94b34";
     targetCtx.strokeStyle = "#172026";
     targetCtx.lineWidth = 3;
     targetCtx.beginPath();
-    targetCtx.moveTo(-CHASSIS_WIDTH / 2, CHASSIS_HEIGHT * 0.18);
-    targetCtx.lineTo(-CHASSIS_WIDTH * 0.38, -CHASSIS_HEIGHT * 0.5);
-    targetCtx.lineTo(CHASSIS_WIDTH * 0.08, -CHASSIS_HEIGHT * 0.68);
-    targetCtx.lineTo(CHASSIS_WIDTH * 0.45, -CHASSIS_HEIGHT * 0.3);
-    targetCtx.lineTo(CHASSIS_WIDTH / 2, CHASSIS_HEIGHT * 0.2);
+    targetCtx.moveTo(-CHASSIS_WIDTH * 0.52, CHASSIS_HEIGHT * 0.2);
+    targetCtx.lineTo(-CHASSIS_WIDTH * 0.43, -CHASSIS_HEIGHT * 0.36);
+    targetCtx.lineTo(-CHASSIS_WIDTH * 0.08, -CHASSIS_HEIGHT * 0.58);
+    targetCtx.lineTo(CHASSIS_WIDTH * 0.36, -CHASSIS_HEIGHT * 0.42);
+    targetCtx.lineTo(CHASSIS_WIDTH * 0.55, CHASSIS_HEIGHT * 0.1);
+    targetCtx.lineTo(CHASSIS_WIDTH * 0.34, CHASSIS_HEIGHT * 0.34);
+    targetCtx.lineTo(-CHASSIS_WIDTH * 0.34, CHASSIS_HEIGHT * 0.36);
     targetCtx.closePath();
     targetCtx.fill();
     targetCtx.stroke();
+    drawRollCage(targetCtx);
+    drawDriver(targetCtx);
     targetCtx.fillStyle = "#bfe7f2";
     targetCtx.beginPath();
-    targetCtx.moveTo(-CHASSIS_WIDTH * 0.22, -CHASSIS_HEIGHT * 0.48);
-    targetCtx.lineTo(CHASSIS_WIDTH * 0.06, -CHASSIS_HEIGHT * 0.58);
-    targetCtx.lineTo(CHASSIS_WIDTH * 0.24, -CHASSIS_HEIGHT * 0.28);
-    targetCtx.lineTo(-CHASSIS_WIDTH * 0.28, -CHASSIS_HEIGHT * 0.25);
+    targetCtx.moveTo(-CHASSIS_WIDTH * 0.29, -CHASSIS_HEIGHT * 0.38);
+    targetCtx.lineTo(-CHASSIS_WIDTH * 0.08, -CHASSIS_HEIGHT * 0.5);
+    targetCtx.lineTo(CHASSIS_WIDTH * 0.12, -CHASSIS_HEIGHT * 0.36);
+    targetCtx.lineTo(-CHASSIS_WIDTH * 0.18, -CHASSIS_HEIGHT * 0.22);
     targetCtx.closePath();
     targetCtx.fill();
     targetCtx.stroke();
-    targetCtx.fillStyle = "#f2c14e";
-    targetCtx.fillRect(CHASSIS_WIDTH * 0.14, -CHASSIS_HEIGHT * 0.72, 24, 12);
-    targetCtx.strokeRect(CHASSIS_WIDTH * 0.14, -CHASSIS_HEIGHT * 0.72, 24, 12);
+    targetCtx.fillStyle = "#f7e7a2";
+    targetCtx.fillRect(CHASSIS_WIDTH * 0.37, -CHASSIS_HEIGHT * 0.18, 16, 10);
+    targetCtx.strokeRect(CHASSIS_WIDTH * 0.37, -CHASSIS_HEIGHT * 0.18, 16, 10);
     targetCtx.restore();
   }
 
