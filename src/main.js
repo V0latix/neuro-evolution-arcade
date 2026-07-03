@@ -644,13 +644,26 @@ function humanPrimaryAction() {
 function handleKeydown(event) {
   if (playMode !== "human") return;
 
-  if (event.code === "Space") {
+  if (event.code === "Space" && (!humanAgent || !humanAgent.alive)) {
     event.preventDefault();
     humanPrimaryAction();
     return;
   }
 
   if (game.handleHumanKey(event, humanAgent)) {
+    event.preventDefault();
+    return;
+  }
+
+  if (event.code === "Space") {
+    event.preventDefault();
+    humanPrimaryAction();
+  }
+}
+
+function handleKeyup(event) {
+  if (playMode !== "human") return;
+  if (game.handleHumanKeyUp?.(event, humanAgent)) {
     event.preventDefault();
   }
 }
@@ -1395,21 +1408,38 @@ function createLunarGame() {
         left: agent.pendingLeft,
         right: agent.pendingRight,
       });
-      agent.pendingThrust = false;
-      agent.pendingLeft = false;
-      agent.pendingRight = false;
     },
     humanPrimaryAction(agent) {
       agent.pendingThrust = true;
     },
     handleHumanKey(event, agent) {
       if (!agent) return false;
+      if (event.code === "Space") {
+        agent.pendingThrust = true;
+        return true;
+      }
       if (event.code === "ArrowLeft" || event.code === "KeyA") {
         agent.pendingLeft = true;
         return true;
       }
       if (event.code === "ArrowRight" || event.code === "KeyD") {
         agent.pendingRight = true;
+        return true;
+      }
+      return false;
+    },
+    handleHumanKeyUp(event, agent) {
+      if (!agent) return false;
+      if (event.code === "Space") {
+        agent.pendingThrust = false;
+        return true;
+      }
+      if (event.code === "ArrowLeft" || event.code === "KeyA") {
+        agent.pendingLeft = false;
+        return true;
+      }
+      if (event.code === "ArrowRight" || event.code === "KeyD") {
+        agent.pendingRight = false;
         return true;
       }
       return false;
@@ -1492,6 +1522,7 @@ ui.saveChampion.addEventListener("click", saveChampion);
 ui.loadChampion.addEventListener("click", loadChampion);
 ui.clearChampion.addEventListener("click", clearChampion);
 window.addEventListener("keydown", handleKeydown);
+window.addEventListener("keyup", handleKeyup);
 
 updateGameUi();
 updateModeButtons();

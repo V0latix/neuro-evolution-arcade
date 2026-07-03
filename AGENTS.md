@@ -76,6 +76,10 @@ and champion storage keys.
   mutation.
 - Human play mode is intentionally one physics step per animation frame, even
   when the AI speed slider is higher. This keeps keyboard control playable.
+- Lunar human controls are held-state controls: `keydown` enables thrust or
+  rotation and `keyup` disables it. Do not reset Lunar human control flags in
+  `updateHuman`; otherwise human thrust and rotation become weaker than the AI
+  controls, which are applied continuously frame by frame.
 - Game switching resets the current run and activates only the selected game's
   settings and explanation panel.
 - Pipe gap and pipe spacing reset the current run so one generation is not

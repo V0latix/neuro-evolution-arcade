@@ -311,6 +311,8 @@ test("static app includes every primary control and asset reference", async () =
   assert.doesNotMatch(script, /"pad align"/);
   assert.match(script, /createLunarGame/);
   assert.match(script, /outputLabels: \["thrust", "left", "right"\]/);
+  assert.match(script, /window\.addEventListener\("keyup", handleKeyup\)/);
+  assert.match(script, /handleHumanKeyUp\(event, agent\)/);
   assert.match(script, /sequential: true/);
   assert.match(script, /startAgent\(agent, targetWorld\)/);
   assert.match(script, /sequentialScore\(nextAgents\)/);
@@ -350,6 +352,7 @@ test("static app includes every primary control and asset reference", async () =
   assert.doesNotMatch(script, /12000 \+ agent\.fuel \* 22 - agent\.age \* 1\.8/);
   assert.match(script, /agent\.vx \* signedPadDx < -0\.08/);
   assert.match(script, /wallPenalty \* 2\.8/);
+  assert.doesNotMatch(script, /agent\.pendingThrust = false;\n      agent\.pendingLeft = false;\n      agent\.pendingRight = false;/);
   assert.match(script, /next gap/);
   assert.match(script, /pad dx/);
 });
