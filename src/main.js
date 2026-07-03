@@ -1160,10 +1160,10 @@ function createLunarGame() {
     const wallPenalty = Math.max(0, 1 - wallDistance / 90);
     const padDifficulty = padDifficultyMultiplier(targetWorld);
     const targetAlignment = 0.2 + Math.max(0, 1 - padDx / 360) * 0.8;
-    let controlReward = 0.8;
-    controlReward += Math.max(0, 1 - speed / 4.2) * 1.3;
-    controlReward += Math.max(0, 1 - Math.abs(agent.vy) / 3.8) * 1.3;
-    controlReward += Math.max(0, 1 - angleAbs / 1.2) * 1.2;
+    let controlReward = 0.2;
+    controlReward += Math.max(0, 1 - speed / 4.2) * 0.35;
+    controlReward += Math.max(0, 1 - Math.abs(agent.vy) / 3.8) * 0.35;
+    controlReward += Math.max(0, 1 - angleAbs / 1.2) * 0.35;
     let targetReward = 0;
     targetReward += Math.max(0, 1 - padDx / 430) * 3.0;
     targetReward += Math.max(0, 1 - velocityError / 2.4) * 2.4;
@@ -1193,12 +1193,12 @@ function createLunarGame() {
 
       if (agent.landed) {
         agent.score += 1;
-        agent.fitness += (12000 + agent.fuel * 22 - agent.age * 1.8) * padDifficulty;
+        agent.fitness += (48000 + agent.score * 9000 + agent.fuel * 40 - agent.age * 1.2) * padDifficulty;
         advanceLandingTarget(agent, targetWorld);
       } else {
         const controlledImpact = Math.max(0, 1 - speed / 2.4) * 1000 + Math.max(0, 1 - angleAbs / 0.7) * 700;
         agent.fitness += onPad ? (1400 + controlledImpact) * padDifficulty : 0;
-        agent.fitness -= 1100 + padDx * 1.8 + speed * 340 + angleAbs * 650 + altitude;
+        agent.fitness -= 4200 + padDx * 3.2 + speed * 520 + angleAbs * 900 + altitude * 1.4;
         agent.completed = true;
       }
     }

@@ -107,8 +107,10 @@ and champion storage keys.
   edges. Penalize wrong-way horizontal velocity and wall-hugging away from the
   target. Lunar approach rewards must be based on horizontal pad-distance
   reduction, not diagonal distance reduction, because diagonal distance shrinks
-  when a lander simply falls vertically. Keep its physics, fitness shaping,
-  slider tests, score metric tests, and champion compatibility tests in sync.
+  when a lander simply falls vertically. The touchdown bonus should dominate
+  continuous shaping rewards; otherwise passive falling can outscore a real
+  landing strategy. Keep its physics, fitness shaping, slider tests, score
+  metric tests, and champion compatibility tests in sync.
 - Saved Flappy Bird champions are stored in `localStorage` under the historical
   `neuro-evolution-arcade.pipe-runner.champion`.
 - The previous key `neuro-evolution-arcade.flappy.champion` and legacy key

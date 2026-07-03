@@ -337,8 +337,11 @@ test("static app includes every primary control and asset reference", async () =
   assert.match(script, /const horizontalApproach = previousPadDx - padDx/);
   assert.match(script, /controlReward \* targetAlignment/);
   assert.match(script, /targetReward \* padDifficulty/);
+  assert.match(script, /48000 \+ agent\.score \* 9000/);
+  assert.match(script, /agent\.fitness -= 4200 \+ padDx \* 3\.2 \+ speed \* 520 \+ angleAbs \* 900 \+ altitude \* 1\.4/);
   assert.doesNotMatch(script, /const approach = previousDistance - distance/);
   assert.doesNotMatch(script, /targetReward \+= approach \* 0\.12/);
+  assert.doesNotMatch(script, /12000 \+ agent\.fuel \* 22 - agent\.age \* 1\.8/);
   assert.match(script, /agent\.vx \* signedPadDx < -0\.08/);
   assert.match(script, /wallPenalty \* 2\.8/);
   assert.match(script, /next gap/);
