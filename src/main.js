@@ -1032,6 +1032,7 @@ function createLunarGame() {
     agent.pendingLeft = false;
     agent.pendingRight = false;
     agent.lastDistance = distanceToPad(agent, targetWorld);
+    agent.lastPadDx = Math.abs(agent.x - targetWorld.pad.x);
   }
 
   function advanceLandingTarget(agent, targetWorld) {
@@ -1049,6 +1050,7 @@ function createLunarGame() {
     agent.completed = false;
     agent.age = 0;
     agent.lastDistance = 0;
+    agent.lastPadDx = 0;
     agent.pendingThrust = false;
     agent.pendingLeft = false;
     agent.pendingRight = false;
@@ -1128,7 +1130,7 @@ function createLunarGame() {
   function updateLander(agent, targetWorld, controls) {
     if (!agent.alive) return;
 
-    const previousDistance = agent.lastDistance;
+    const previousPadDx = agent.lastPadDx;
     applyLanderControls(agent, controls);
 
     agent.vy += lunarGravityAccel();
@@ -1150,13 +1152,14 @@ function createLunarGame() {
     const speed = Math.hypot(agent.vx, agent.vy);
     const angleAbs = Math.abs(agent.angle);
     const distance = distanceToPad(agent, targetWorld);
-    const approach = previousDistance - distance;
     const signedPadDx = targetWorld.pad.x - agent.x;
+    const horizontalApproach = previousPadDx - padDx;
     const desiredVx = clamp(signedPadDx / 260, -1.35, 1.35);
     const velocityError = Math.abs(agent.vx - desiredVx);
     const wallDistance = Math.min(agent.x, WIDTH - agent.x);
     const wallPenalty = Math.max(0, 1 - wallDistance / 90);
     const padDifficulty = padDifficultyMultiplier(targetWorld);
+    const targetAlignment = 0.2 + Math.max(0, 1 - padDx / 360) * 0.8;
     let controlReward = 0.8;
     controlReward += Math.max(0, 1 - speed / 4.2) * 1.3;
     controlReward += Math.max(0, 1 - Math.abs(agent.vy) / 3.8) * 1.3;
@@ -1164,9 +1167,14 @@ function createLunarGame() {
     let targetReward = 0;
     targetReward += Math.max(0, 1 - padDx / 430) * 3.0;
     targetReward += Math.max(0, 1 - velocityError / 2.4) * 2.4;
-    if (approach > 0) targetReward += approach * 0.12;
+    if (horizontalApproach > 0) targetReward += horizontalApproach * 0.34;
+    if (horizontalApproach < -0.05) targetReward += horizontalApproach * 0.22;
     agent.lastDistance = distance;
-    agent.fitness += controlReward + targetReward * padDifficulty;
+    agent.lastPadDx = padDx;
+    agent.fitness += controlReward * targetAlignment + targetReward * padDifficulty;
+    if (padDx > targetWorld.pad.width / 2 && Math.abs(agent.vx) < 0.08 && altitude < MOON_Y * 0.82) {
+      agent.fitness -= Math.min(3.4, padDx / 120);
+    }
     if (padDx > targetWorld.pad.width / 2 && agent.vx * signedPadDx < -0.08) {
       agent.fitness -= Math.min(2.6, Math.abs(agent.vx) * 0.9);
     }
@@ -1326,6 +1334,7 @@ function createLunarGame() {
         completed: false,
         age: 0,
         lastDistance: 0,
+        lastPadDx: 0,
         pendingThrust: false,
         pendingLeft: false,
         pendingRight: false,

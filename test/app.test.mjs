@@ -333,7 +333,12 @@ test("static app includes every primary control and asset reference", async () =
   assert.match(script, /function padDifficultyMultiplier\(targetWorld\)/);
   assert.match(script, /normalizedOffset/);
   assert.match(script, /const desiredVx = clamp\(signedPadDx \/ 260, -1\.35, 1\.35\)/);
+  assert.match(script, /const previousPadDx = agent\.lastPadDx/);
+  assert.match(script, /const horizontalApproach = previousPadDx - padDx/);
+  assert.match(script, /controlReward \* targetAlignment/);
   assert.match(script, /targetReward \* padDifficulty/);
+  assert.doesNotMatch(script, /const approach = previousDistance - distance/);
+  assert.doesNotMatch(script, /targetReward \+= approach \* 0\.12/);
   assert.match(script, /agent\.vx \* signedPadDx < -0\.08/);
   assert.match(script, /wallPenalty \* 2\.8/);
   assert.match(script, /next gap/);
