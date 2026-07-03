@@ -1485,43 +1485,108 @@ function createLunarGame() {
 
 function createHillClimbGame() {
   const TERRAIN = [
-    { x: 0, y: 430 },
-    { x: 260, y: 420 },
-    { x: 540, y: 395 },
-    { x: 820, y: 440 },
-    { x: 1120, y: 370 },
-    { x: 1480, y: 445 },
-    { x: 1840, y: 330 },
-    { x: 2220, y: 430 },
-    { x: 2600, y: 300 },
-    { x: 3000, y: 455 },
-    { x: 3380, y: 360 },
-    { x: 3800, y: 410 },
-    { x: 4200, y: 285 },
-    { x: 4650, y: 460 },
-    { x: 5100, y: 315 },
-    { x: 5600, y: 430 },
-    { x: 6100, y: 250 },
-    { x: 6600, y: 455 },
-    { x: 7200, y: 300 },
-    { x: 7900, y: 420 },
-    { x: 8600, y: 250 },
-    { x: 9300, y: 470 },
-    { x: 10100, y: 260 },
-    { x: 10850, y: 455 },
-    { x: 11600, y: 235 },
-    { x: 12400, y: 470 },
-    { x: 13200, y: 320 },
-    { x: 14000, y: 455 },
-    { x: 14800, y: 220 },
-    { x: 15500, y: 465 },
-    { x: 16400, y: 300 },
-    { x: 17300, y: 470 },
-    { x: 18300, y: 240 },
-    { x: 19300, y: 455 },
-    { x: 20400, y: 310 },
-    { x: 21400, y: 470 },
-    { x: 22000, y: 300 },
+    { x: 0, y: 424 },
+    { x: 180, y: 418 },
+    { x: 360, y: 440 },
+    { x: 560, y: 410 },
+    { x: 760, y: 448 },
+    { x: 980, y: 402 },
+    { x: 1200, y: 436 },
+    { x: 1440, y: 390 },
+    { x: 1680, y: 450 },
+    { x: 1940, y: 382 },
+    { x: 2220, y: 438 },
+    { x: 2520, y: 362 },
+    { x: 2820, y: 458 },
+    { x: 3140, y: 346 },
+    { x: 3460, y: 450 },
+    { x: 3800, y: 330 },
+    { x: 4140, y: 462 },
+    { x: 4500, y: 318 },
+    { x: 4860, y: 452 },
+    { x: 5220, y: 338 },
+    { x: 5600, y: 468 },
+    { x: 6000, y: 300 },
+    { x: 6400, y: 456 },
+    { x: 6820, y: 334 },
+    { x: 7240, y: 468 },
+    { x: 7660, y: 286 },
+    { x: 8080, y: 438 },
+    { x: 8500, y: 308 },
+    { x: 8920, y: 472 },
+    { x: 9340, y: 276 },
+    { x: 9760, y: 452 },
+    { x: 10180, y: 320 },
+    { x: 10600, y: 476 },
+    { x: 11020, y: 262 },
+    { x: 11440, y: 458 },
+    { x: 11860, y: 300 },
+    { x: 12280, y: 474 },
+    { x: 12700, y: 246 },
+    { x: 13120, y: 460 },
+    { x: 13540, y: 314 },
+    { x: 13960, y: 474 },
+    { x: 14380, y: 238 },
+    { x: 14800, y: 446 },
+    { x: 15220, y: 292 },
+    { x: 15640, y: 478 },
+    { x: 16040, y: 234 },
+    { x: 16440, y: 456 },
+    { x: 16840, y: 330 },
+    { x: 17240, y: 478 },
+    { x: 17640, y: 224 },
+    { x: 18040, y: 448 },
+    { x: 18440, y: 282 },
+    { x: 18840, y: 482 },
+    { x: 19240, y: 222 },
+    { x: 19640, y: 462 },
+    { x: 20040, y: 318 },
+    { x: 20440, y: 480 },
+    { x: 20840, y: 214 },
+    { x: 21240, y: 452 },
+    { x: 21640, y: 292 },
+    { x: 22040, y: 482 },
+    { x: 22440, y: 228 },
+    { x: 22840, y: 468 },
+    { x: 23240, y: 336 },
+    { x: 23640, y: 478 },
+    { x: 24040, y: 220 },
+    { x: 24440, y: 444 },
+    { x: 24840, y: 286 },
+    { x: 25240, y: 486 },
+    { x: 25640, y: 214 },
+    { x: 26040, y: 462 },
+    { x: 26440, y: 310 },
+    { x: 26840, y: 486 },
+    { x: 27240, y: 226 },
+    { x: 27640, y: 452 },
+    { x: 28040, y: 278 },
+    { x: 28440, y: 486 },
+    { x: 28840, y: 218 },
+    { x: 29240, y: 468 },
+    { x: 29640, y: 328 },
+    { x: 30040, y: 484 },
+    { x: 30440, y: 210 },
+    { x: 30840, y: 440 },
+    { x: 31240, y: 284 },
+    { x: 31640, y: 488 },
+    { x: 32040, y: 212 },
+    { x: 32440, y: 466 },
+    { x: 32840, y: 304 },
+    { x: 33240, y: 488 },
+    { x: 33640, y: 220 },
+    { x: 34040, y: 452 },
+    { x: 34440, y: 272 },
+    { x: 34840, y: 488 },
+    { x: 35240, y: 218 },
+    { x: 35640, y: 470 },
+    { x: 36040, y: 326 },
+    { x: 36440, y: 486 },
+    { x: 36840, y: 214 },
+    { x: 37240, y: 454 },
+    { x: 37640, y: 294 },
+    { x: 38040, y: 486 },
+    { x: 38400, y: 252 },
   ];
   const CHASSIS_WIDTH = 125;
   const CHASSIS_HEIGHT = 40;
@@ -1543,22 +1608,23 @@ function createHillClimbGame() {
   const HILL_AIR_TILT = 0.0018;
   const WHEEL_BASE_STIFFNESS = 0.58;
   const CHASSIS_ANGLE_FOLLOW = 0.18;
-  const CHASSIS_BODY_LIFT = 64;
+  const CHASSIS_BODY_LIFT = 56;
   const CHASSIS_SCRAPE_LIMIT = 40;
   const CHASSIS_HARD_IMPACT_SPEED = 7.2;
   const HILL_SUBSTEPS = 3;
-  const SUSPENSION_REST_LENGTH = 46;
+  const SUSPENSION_REST_LENGTH = 36;
   const MAX_FUEL = 1200;
   const START_X = 120;
   const START_Y_OFFSET = 76;
   const LEVEL_END = TERRAIN[TERRAIN.length - 1].x;
-  const COIN_X = [
-    390, 660, 980, 1290, 1710, 2060, 2460, 2840, 3220, 3660, 4040, 4460, 4940, 5420, 5960,
-    6460, 7040, 7600, 8450, 9100, 9900, 10600, 11400, 12200, 13050, 13800, 14600, 15400,
-    16250, 17100, 18100, 19100, 20200, 21200, 21850,
-  ];
+  const FUEL_SPACING = 900;
+  const COIN_X = Array.from({ length: Math.floor((LEVEL_END - 390) / 450) }, (_, index) => {
+    return 390 + index * 450;
+  });
   const COIN_LIFTS = [42, 32, 38];
-  const FUEL_X = [1050, 2180, 3420, 4920, 6420, 7420, 9000, 10800, 12800, 15000, 17300, 19600, 21400];
+  const FUEL_X = Array.from({ length: Math.floor((LEVEL_END - FUEL_SPACING) / FUEL_SPACING) }, (_, index) => {
+    return FUEL_SPACING * (index + 1);
+  });
 
   function smoothstep(value) {
     return value * value * (3 - 2 * value);
@@ -2052,28 +2118,43 @@ function createHillClimbGame() {
     targetCtx.strokeRect(CHASSIS_WIDTH * 0.01, -CHASSIS_HEIGHT * 1.02, 18, 8);
   }
 
+  function drawSuspension(targetCtx, suspension, cameraX) {
+    const mountX = suspension.mount.x - cameraX;
+    const mountY = suspension.mount.y;
+    const wheelX = suspension.wheel.x - cameraX;
+    const wheelY = suspension.wheel.y;
+    const dx = wheelX - mountX;
+    const dy = wheelY - mountY;
+    const length = Math.hypot(dx, dy) || 1;
+    const topOffset = 8 / length;
+    const bottomOffset = Math.max(0, (WHEEL_RADIUS - 2) / length);
+    const startX = mountX + dx * topOffset;
+    const startY = mountY + dy * topOffset;
+    const endX = mountX + dx * (1 - bottomOffset);
+    const endY = mountY + dy * (1 - bottomOffset);
+
+    targetCtx.strokeStyle = "rgba(23,32,38,0.5)";
+    targetCtx.lineWidth = 3;
+    targetCtx.beginPath();
+    targetCtx.moveTo(startX, startY);
+    targetCtx.lineTo(endX, endY);
+    targetCtx.stroke();
+
+    targetCtx.strokeStyle = "#c9d5d1";
+    targetCtx.lineWidth = 1.25;
+    targetCtx.beginPath();
+    targetCtx.moveTo(startX, startY);
+    targetCtx.lineTo(endX, endY);
+    targetCtx.stroke();
+  }
+
   function drawVehicle(targetCtx, agent, cameraX) {
     const screenX = agent.x - cameraX;
     const rear = suspensionWheel(agent, -1);
     const front = suspensionWheel(agent, 1);
 
-    targetCtx.strokeStyle = "rgba(23,32,38,0.55)";
-    targetCtx.lineWidth = 5;
-    targetCtx.beginPath();
-    targetCtx.moveTo(rear.wheel.x - cameraX, rear.wheel.y);
-    targetCtx.lineTo(rear.mount.x - cameraX, rear.mount.y);
-    targetCtx.moveTo(front.wheel.x - cameraX, front.wheel.y);
-    targetCtx.lineTo(front.mount.x - cameraX, front.mount.y);
-    targetCtx.stroke();
-
-    targetCtx.strokeStyle = "#c9d5d1";
-    targetCtx.lineWidth = 2;
-    targetCtx.beginPath();
-    targetCtx.moveTo(rear.wheel.x - cameraX, rear.wheel.y);
-    targetCtx.lineTo(rear.mount.x - cameraX, rear.mount.y);
-    targetCtx.moveTo(front.wheel.x - cameraX, front.wheel.y);
-    targetCtx.lineTo(front.mount.x - cameraX, front.mount.y);
-    targetCtx.stroke();
+    drawSuspension(targetCtx, rear, cameraX);
+    drawSuspension(targetCtx, front, cameraX);
 
     for (const { wheel } of [rear, front]) {
       targetCtx.fillStyle = "#172026";
