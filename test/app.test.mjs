@@ -44,10 +44,13 @@ class ClassList {
 }
 
 class MockElement {
-  constructor({ id, tagName, value = "", textContent = "", className = "" }) {
+  constructor({ id, tagName, value = "", textContent = "", className = "", min = "", max = "", step = "" }) {
     this.id = id;
     this.tagName = tagName.toUpperCase();
     this.value = value;
+    this.min = min;
+    this.max = max;
+    this.step = step;
     this.textContent = textContent;
     this.disabled = false;
     this.listeners = new Map();
@@ -155,6 +158,9 @@ function parseElements(html) {
     const id = match[3];
     const value = attr(attrs, "value");
     const className = attr(attrs, "class");
+    const min = attr(attrs, "min");
+    const max = attr(attrs, "max");
+    const step = attr(attrs, "step");
     const textContent = closingText(html, match.index, tagName);
 
     elements.set(
@@ -164,6 +170,9 @@ function parseElements(html) {
         tagName,
         value,
         className,
+        min,
+        max,
+        step,
         textContent,
       }),
     );
@@ -414,7 +423,9 @@ test("game picker switches to Lunar Lander with dedicated sliders and network sh
   assert.equal(element(harness, "lunarGravityValue").textContent, "0.17g");
   assert.equal(element(harness, "lunarFuelValue").textContent, "120");
   assert.equal(element(harness, "lunarPadSizeValue").textContent, "150");
-  assert.equal(element(harness, "lunarThrustValue").textContent, "0.145");
+  assert.equal(element(harness, "lunarThrust").value, "0.190");
+  assert.equal(element(harness, "lunarThrust").max, "0.260");
+  assert.equal(element(harness, "lunarThrustValue").textContent, "0.190");
 
   const networkCalls = element(harness, "network").getContext().calls;
   const labels = networkCalls.filter((call) => call.type === "fillText").map((call) => call.text);

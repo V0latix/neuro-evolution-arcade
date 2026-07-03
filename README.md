@@ -48,7 +48,8 @@ At generation end, selection keeps the strongest fitness, then crossover and
 mutation create the next generation. The visible score is the best individual
 specimen score observed in the generation, not the sum of all specimens.
 Lunar gravity is configured as a fraction of Earth gravity: the default `0.17g`
-is close to the Moon's gravity.
+is close to the Moon's gravity. The default engine power is `0.190`, which
+keeps enough upward authority while the lander tilts toward side targets.
 The Lunar fitness also weights target-oriented rewards by pad difficulty:
 landing, moving toward, or matching a useful horizontal velocity for a pad near
 an edge is worth more than the same behavior on a central pad. Generic survival

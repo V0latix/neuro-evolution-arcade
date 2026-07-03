@@ -995,7 +995,7 @@ function createLunarGame() {
   }
 
   function thrustPower() {
-    return clamp(numberValue(ui.lunarThrust, 0.145), 0.115, 0.18);
+    return clamp(numberValue(ui.lunarThrust, 0.19), 0.145, 0.26);
   }
 
   function makeSequencePad() {

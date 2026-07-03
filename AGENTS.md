@@ -86,8 +86,10 @@ and champion storage keys.
   scored across mixed difficulty settings.
 - Lunar Lander Lite uses a dedicated settings panel for gravity, initial fuel,
   platform size, and engine power. The gravity slider is expressed as a fraction
-  of Earth gravity, so the default Moon-like value is `0.17g`. These controls
-  must be hidden for Flappy Bird, and changing them should reset Lunar training.
+  of Earth gravity, so the default Moon-like value is `0.17g`. The default
+  engine power is `0.190`, giving the lander enough upward authority while
+  tilted toward side targets. These controls must be hidden for Flappy Bird, and
+  changing them should reset Lunar training.
 - Flappy Bird pipe controls (`pipeSettings`, `pipeGap`, `pipeSpacing`, and
   `presetPanel`) must be visible only for Flappy Bird. Lunar should never show
   pipe sliders.
