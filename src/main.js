@@ -1658,22 +1658,25 @@ function createHillClimbGame() {
   const CODE_BULLET_RIM_RESTITUTION = 0.2;
   const CODE_BULLET_SUSPENSION_FREQUENCY = 70;
   const CODE_BULLET_SUSPENSION_DAMPING = 25;
+  const CHASSIS_MASS = 5.8;
+  const WHEEL_MASS = 0.32;
+  const SUSPENSION_STIFFNESS = 0.22;
+  const SUSPENSION_DAMPING = 0.34;
+  const SUSPENSION_MAX_FORCE = 3.2;
   const HILL_MAX_SPIN = 0.085;
   const HILL_GROUND_TILT = 0.00026;
   const HILL_AIR_TILT = 0.0024;
   const HILL_BRAKE_FORCE = 0.42;
   const HILL_AIR_PEDAL_TORQUE = 0.0032;
   const WHEEL_BASE_STIFFNESS = 0.58;
-  const WHEEL_CHASSIS_STIFFNESS = 0.48;
-  const WHEEL_CHASSIS_DAMPING = 0.18;
-  const CHASSIS_ANGLE_FOLLOW = 0.14;
+  const CHASSIS_ANGLE_FOLLOW = 0.1;
   const HILL_AIR_ANGLE_FOLLOW = 0.006;
   const HILL_AIR_ROTATION_DAMPING = 0.996;
-  const CHASSIS_BODY_LIFT = 34;
+  const CHASSIS_BODY_LIFT = 26;
   const CHASSIS_SCRAPE_LIMIT = 40;
   const CHASSIS_HARD_IMPACT_SPEED = 7.2;
-  const HILL_SUBSTEPS = 3;
-  const SUSPENSION_REST_LENGTH = 15;
+  const HILL_SUBSTEPS = 4;
+  const SUSPENSION_REST_LENGTH = 12;
   const MAX_SUSPENSION_EXTENSION = SUSPENSION_REST_LENGTH + WHEEL_RADIUS * 0.85;
   const MAX_FUEL = 1200;
   const START_X = 120;
@@ -1761,7 +1764,7 @@ function createHillClimbGame() {
 
   function suspensionWheel(agent, side) {
     const localX = side * WHEEL_BASE * 0.42;
-    const mount = localPoint(agent, localX, CHASSIS_HEIGHT * 0.22);
+    const mount = localPoint(agent, localX, CHASSIS_HEIGHT * 0.36);
     const wheel = wheelPoint(agent, side);
     const length = Math.hypot(wheel.x - mount.x, wheel.y - mount.y);
     const compression = clamp(SUSPENSION_REST_LENGTH - length, 0, SUSPENSION_REST_LENGTH);
@@ -1915,31 +1918,39 @@ function createHillClimbGame() {
     agent.frontWheel.y -= adjustY;
   }
 
-  function constrainWheelToChassis(agent, wheel, side) {
-    const mount = localPoint(agent, side * WHEEL_BASE * 0.42, CHASSIS_HEIGHT * 0.22);
+  function solveSuspensionJoint(agent, wheel, side, dt) {
+    const mount = localPoint(agent, side * WHEEL_BASE * 0.42, CHASSIS_HEIGHT * 0.36);
     const dx = wheel.x - mount.x;
     const dy = wheel.y - mount.y;
     const distance = Math.hypot(dx, dy) || 1;
-    if (distance <= MAX_SUSPENSION_EXTENSION) return;
-
-    const excess = (distance - MAX_SUSPENSION_EXTENSION) * WHEEL_CHASSIS_STIFFNESS;
     const nx = dx / distance;
     const ny = dy / distance;
-    const wheelShare = wheel.contact ? 0.14 : 0.36;
+    const mountVx = agent.vx - agent.angularVelocity * mount.relY;
+    const mountVy = agent.vy + agent.angularVelocity * mount.relX;
+    const relativeSpeed = (wheel.vx - mountVx) * nx + (wheel.vy - mountVy) * ny;
+    const springForce = clamp(
+      (distance - SUSPENSION_REST_LENGTH) * SUSPENSION_STIFFNESS + relativeSpeed * SUSPENSION_DAMPING,
+      -SUSPENSION_MAX_FORCE,
+      SUSPENSION_MAX_FORCE,
+    );
+    const impulse = springForce * dt;
+    const wheelShare = wheel.contact ? 0.08 : CHASSIS_MASS / (CHASSIS_MASS + WHEEL_MASS);
     const bodyShare = 1 - wheelShare;
 
-    agent.x += nx * excess * bodyShare;
-    agent.y += ny * excess * bodyShare;
-    wheel.x -= nx * excess * wheelShare;
-    wheel.y -= ny * excess * wheelShare;
+    agent.vx += nx * impulse * bodyShare;
+    agent.vy += ny * impulse * bodyShare;
+    wheel.vx -= nx * impulse * wheelShare;
+    wheel.vy -= ny * impulse * wheelShare;
+    agent.angularVelocity += (mount.relX * ny - mount.relY * nx) * impulse * 0.0007;
 
-    const relativeVelocity = (wheel.vx - agent.vx) * nx + (wheel.vy - agent.vy) * ny;
-    if (relativeVelocity <= 0) return;
-    const damping = relativeVelocity * WHEEL_CHASSIS_DAMPING;
-    agent.vx += nx * damping * bodyShare;
-    agent.vy += ny * damping * bodyShare;
-    wheel.vx -= nx * damping * wheelShare;
-    wheel.vy -= ny * damping * wheelShare;
+    const positionError = distance - SUSPENSION_REST_LENGTH;
+    if (Math.abs(positionError) < 0.02) return;
+    const correction = clamp(positionError, -SUSPENSION_REST_LENGTH * 0.45, MAX_SUSPENSION_EXTENSION - SUSPENSION_REST_LENGTH);
+    const positionalPull = correction * (wheel.contact ? 0.62 : 0.36);
+    agent.x += nx * positionalPull * bodyShare;
+    agent.y += ny * positionalPull * bodyShare;
+    wheel.x -= nx * positionalPull * wheelShare;
+    wheel.y -= ny * positionalPull * wheelShare;
   }
 
   function alignChassisToWheels(agent, action, dt) {
@@ -1953,13 +1964,14 @@ function createHillClimbGame() {
     const grounded = rear.contact || front.contact;
     const pedalTilt = action.gas ? -1 : action.brake ? 1 : 0;
 
-    const jointPull = grounded ? Math.min(0.52, CODE_BULLET_SUSPENSION_FREQUENCY / 150) : 0.12;
-    const jointDamping = grounded ? 1 / (1 + CODE_BULLET_SUSPENSION_DAMPING * 0.018) : 0.985;
+    const jointPull = grounded ? Math.min(0.18, CODE_BULLET_SUSPENSION_FREQUENCY / 420) : 0.045;
+    const jointDamping = grounded ? 1 / (1 + CODE_BULLET_SUSPENSION_DAMPING * 0.006) : 0.992;
 
-    agent.vx = (rear.vx + front.vx) * 0.5;
+    agent.vx += ((rear.vx + front.vx) * 0.5 - agent.vx) * (grounded ? 0.45 : 0.12);
+    agent.vy += HILL_GRAVITY * 0.72 * dt;
     agent.vy += (targetY - agent.y) * jointPull;
     agent.vy *= jointDamping;
-    agent.x += (targetX - agent.x) * (grounded ? 0.9 : 0.3);
+    agent.x += (targetX - agent.x) * (grounded ? 0.42 : 0.16);
     agent.y += agent.vy * dt;
     agent.y += (targetY - agent.y) * jointPull;
 
@@ -2061,9 +2073,11 @@ function createHillClimbGame() {
       integrateWheel(agent, agent.rearWheel, -1, effectiveAction, dt);
       integrateWheel(agent, agent.frontWheel, 1, effectiveAction, dt);
       enforceWheelBase(agent);
+      solveSuspensionJoint(agent, agent.rearWheel, -1, dt);
+      solveSuspensionJoint(agent, agent.frontWheel, 1, dt);
       alignChassisToWheels(agent, effectiveAction, dt);
-      constrainWheelToChassis(agent, agent.rearWheel, -1);
-      constrainWheelToChassis(agent, agent.frontWheel, 1);
+      solveSuspensionJoint(agent, agent.rearWheel, -1, dt);
+      solveSuspensionJoint(agent, agent.frontWheel, 1, dt);
       enforceWheelBase(agent);
       agent.rearContact = agent.rearContact || agent.rearWheel.contact;
       agent.frontContact = agent.frontContact || agent.frontWheel.contact;

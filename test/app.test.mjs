@@ -350,15 +350,19 @@ test("static app includes every primary control and asset reference", async () =
   assert.match(script, /const HILL_BRAKE_FORCE = 0\.42/);
   assert.match(script, /const HILL_AIR_PEDAL_TORQUE = 0\.0032/);
   assert.match(script, /const WHEEL_BASE_STIFFNESS = 0\.58/);
-  assert.match(script, /const WHEEL_CHASSIS_STIFFNESS = 0\.48/);
-  assert.match(script, /const WHEEL_CHASSIS_DAMPING = 0\.18/);
-  assert.match(script, /const CHASSIS_ANGLE_FOLLOW = 0\.14/);
+  assert.match(script, /const CHASSIS_MASS = 5\.8/);
+  assert.match(script, /const WHEEL_MASS = 0\.32/);
+  assert.match(script, /const SUSPENSION_STIFFNESS = 0\.22/);
+  assert.match(script, /const SUSPENSION_DAMPING = 0\.34/);
+  assert.match(script, /const SUSPENSION_MAX_FORCE = 3\.2/);
+  assert.match(script, /const CHASSIS_ANGLE_FOLLOW = 0\.1/);
   assert.match(script, /const HILL_AIR_ANGLE_FOLLOW = 0\.006/);
   assert.match(script, /const HILL_AIR_ROTATION_DAMPING = 0\.996/);
-  assert.match(script, /const CHASSIS_BODY_LIFT = 34/);
+  assert.match(script, /const CHASSIS_BODY_LIFT = 26/);
   assert.match(script, /const CHASSIS_SCRAPE_LIMIT = 40/);
   assert.match(script, /const CHASSIS_HARD_IMPACT_SPEED = 7\.2/);
-  assert.match(script, /const SUSPENSION_REST_LENGTH = 15/);
+  assert.match(script, /const HILL_SUBSTEPS = 4/);
+  assert.match(script, /const SUSPENSION_REST_LENGTH = 12/);
   assert.match(script, /const MAX_SUSPENSION_EXTENSION = SUSPENSION_REST_LENGTH \+ WHEEL_RADIUS \* 0\.85/);
   assert.match(script, /const FUEL_SPACING = 900/);
   assert.match(script, /const COIN_X = Array\.from/);
@@ -374,7 +378,7 @@ test("static app includes every primary control and asset reference", async () =
   assert.match(script, /const torque = clamp\(speedError \* CODE_BULLET_MOTOR_RESPONSE, -maxTorque, maxTorque\)/);
   assert.match(script, /function integrateWheel\(agent, wheel, side, action, dt\)/);
   assert.match(script, /function enforceWheelBase\(agent\)/);
-  assert.match(script, /function constrainWheelToChassis\(agent, wheel, side\)/);
+  assert.match(script, /function solveSuspensionJoint\(agent, wheel, side, dt\)/);
   assert.match(script, /function alignChassisToWheels\(agent, action, dt\)/);
   assert.match(script, /function suspensionWheel\(agent, side\)/);
   assert.match(script, /drawDriver\(targetCtx\)/);
@@ -394,8 +398,9 @@ test("static app includes every primary control and asset reference", async () =
   assert.match(script, /drawHillDistanceBadge\(targetCtx, currentScore\)/);
   assert.match(script, /targetCtx\.lineWidth = 2/);
   assert.match(script, /applyCodeBulletMotor\(wheel, side, action, dt\)/);
-  assert.match(script, /constrainWheelToChassis\(agent, agent\.rearWheel, -1\)/);
-  assert.match(script, /constrainWheelToChassis\(agent, agent\.frontWheel, 1\)/);
+  assert.match(script, /solveSuspensionJoint\(agent, agent\.rearWheel, -1, dt\)/);
+  assert.match(script, /solveSuspensionJoint\(agent, agent\.frontWheel, 1, dt\)/);
+  assert.doesNotMatch(script, /constrainWheelToChassis/);
   assert.match(script, /deepest > CHASSIS_SCRAPE_LIMIT/);
   assert.doesNotMatch(script, /function applyForce\(agent, point, forceX, forceY/);
   assert.doesNotMatch(script, /function applyWheel\(agent, side, action, contact\)/);
@@ -728,7 +733,9 @@ test("Hill Climb human mode restarts a crashed run with Space", async () => {
     code: "ArrowRight",
     preventDefault() {},
   });
-  harness.runFrame(900);
+  for (let i = 0; i < 5000 && element(harness, "alive").textContent !== "0"; i += 1) {
+    harness.runFrame();
+  }
   harness.window.dispatchEvent({
     type: "keyup",
     code: "ArrowRight",
