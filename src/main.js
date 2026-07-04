@@ -1496,18 +1496,24 @@ function createHillClimbGame() {
     { x: 2340, y: 426 },
     { x: 2700, y: 404 },
     { x: 3040, y: 370 },
-    { x: 3400, y: 356 },
-    { x: 3740, y: 370 },
+    { x: 3340, y: 342 },
+    { x: 3520, y: 462 },
+    { x: 3720, y: 304 },
+    { x: 3900, y: 456 },
     { x: 4020, y: 338 },
-    { x: 4240, y: 292 },
-    { x: 4480, y: 286 },
-    { x: 4760, y: 492 },
-    { x: 5160, y: 492 },
-    { x: 5460, y: 330 },
-    { x: 5700, y: 356 },
-    { x: 5940, y: 424 },
-    { x: 6160, y: 456 },
-    { x: 6550, y: 418 },
+    { x: 4180, y: 304 },
+    { x: 4380, y: 456 },
+    { x: 4620, y: 286 },
+    { x: 4860, y: 494 },
+    { x: 5120, y: 494 },
+    { x: 5340, y: 344 },
+    { x: 5560, y: 418 },
+    { x: 5720, y: 486 },
+    { x: 5900, y: 300 },
+    { x: 6080, y: 492 },
+    { x: 6260, y: 304 },
+    { x: 6460, y: 482 },
+    { x: 6660, y: 318 },
     { x: 6840, y: 462 },
     { x: 7040, y: 330 },
     { x: 7240, y: 466 },
@@ -1517,8 +1523,10 @@ function createHillClimbGame() {
     { x: 8040, y: 450 },
     { x: 8240, y: 354 },
     { x: 8580, y: 438 },
-    { x: 9000, y: 404 },
-    { x: 9400, y: 362 },
+    { x: 8840, y: 378 },
+    { x: 9120, y: 296 },
+    { x: 9300, y: 482 },
+    { x: 9500, y: 482 },
     { x: 9820, y: 340 },
     { x: 10280, y: 356 },
     { x: 10720, y: 402 },
@@ -1661,11 +1669,11 @@ function createHillClimbGame() {
   const CHASSIS_ANGLE_FOLLOW = 0.14;
   const HILL_AIR_ANGLE_FOLLOW = 0.006;
   const HILL_AIR_ROTATION_DAMPING = 0.996;
-  const CHASSIS_BODY_LIFT = 45;
+  const CHASSIS_BODY_LIFT = 34;
   const CHASSIS_SCRAPE_LIMIT = 40;
   const CHASSIS_HARD_IMPACT_SPEED = 7.2;
   const HILL_SUBSTEPS = 3;
-  const SUSPENSION_REST_LENGTH = 24;
+  const SUSPENSION_REST_LENGTH = 15;
   const MAX_FUEL = 1200;
   const START_X = 120;
   const START_Y_OFFSET = 76;
