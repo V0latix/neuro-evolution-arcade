@@ -2585,7 +2585,9 @@ function createFormulaCircuitGame() {
     x: point.x,
     y: point.y,
     name: point.name,
-    radius: index === START_INDEX ? 122 : 104,
+    angle: closestOnTrack(point.x, point.y).angle,
+    lineHalfWidth: TRACK_WIDTH * 0.62,
+    isStart: index === START_INDEX,
   }));
 
   function normalizeAngle(angle) {
@@ -2653,6 +2655,28 @@ function createFormulaCircuitGame() {
     return delta;
   }
 
+  function crossedCheckpointLine(agent, checkpoint) {
+    const tangentX = Math.cos(checkpoint.angle);
+    const tangentY = Math.sin(checkpoint.angle);
+    const lateralX = -tangentY;
+    const lateralY = tangentX;
+    const previousDx = agent.previousX - checkpoint.x;
+    const previousDy = agent.previousY - checkpoint.y;
+    const currentDx = agent.x - checkpoint.x;
+    const currentDy = agent.y - checkpoint.y;
+    const previousSide = previousDx * tangentX + previousDy * tangentY;
+    const currentSide = currentDx * tangentX + currentDy * tangentY;
+    const sideDelta = currentSide - previousSide;
+
+    if (previousSide > 0 || currentSide < 0 || sideDelta <= 0) return false;
+
+    const ratio = clamp(-previousSide / sideDelta, 0, 1);
+    const previousLateral = previousDx * lateralX + previousDy * lateralY;
+    const currentLateral = currentDx * lateralX + currentDy * lateralY;
+    const crossingLateral = previousLateral + (currentLateral - previousLateral) * ratio;
+    return Math.abs(crossingLateral) <= checkpoint.lineHalfWidth;
+  }
+
   function resetFormulaAgent(agent) {
     const start = TRACK[START_INDEX];
     const startSegment = SEGMENTS[START_INDEX];
@@ -2662,6 +2686,8 @@ function createFormulaCircuitGame() {
     agent.vy = 0;
     agent.angle = startSegment.angle + (Math.random() * 0.22 - 0.11);
     agent.angularVelocity = 0;
+    agent.previousX = agent.x;
+    agent.previousY = agent.y;
     agent.alive = true;
     agent.fitness = 0;
     agent.score = 0;
@@ -2684,17 +2710,17 @@ function createFormulaCircuitGame() {
 
   function updateCheckpoint(agent) {
     const checkpoint = checkpointTarget(agent);
-    if (Math.hypot(agent.x - checkpoint.x, agent.y - checkpoint.y) > checkpoint.radius) return;
+    if (!crossedCheckpointLine(agent, checkpoint)) return;
 
     agent.checkpoints += 1;
     agent.score = agent.laps * CHECKPOINTS.length + agent.checkpoints;
-    agent.fitness += 1200 + Math.max(0, MAX_AGE - agent.age) * 0.05;
+    agent.fitness += 2800 + Math.max(0, MAX_AGE - agent.age) * 0.08;
     agent.lastProgressFrame = agent.age;
     agent.nextCheckpoint = (agent.nextCheckpoint + 1) % CHECKPOINTS.length;
 
     if (agent.nextCheckpoint === 1) {
       agent.laps += 1;
-      agent.fitness += 7000;
+      agent.fitness += 12000;
     }
   }
 
@@ -2754,7 +2780,6 @@ function createFormulaCircuitGame() {
     const rightY = forwardX;
     let forwardSpeed = agent.vx * forwardX + agent.vy * forwardY;
     let sideSpeed = agent.vx * rightX + agent.vy * rightY;
-    const speed = Math.hypot(agent.vx, agent.vy);
     const steering = (action.right ? 1 : 0) - (action.left ? 1 : 0);
 
     if (action.gas) forwardSpeed += ACCELERATION;
@@ -2770,42 +2795,40 @@ function createFormulaCircuitGame() {
     agent.angle = normalizeAngle(agent.angle + agent.angularVelocity);
     agent.angularVelocity *= 0.72;
 
+    const track = closestOnTrack(agent.x, agent.y);
     agent.vx = forwardX * forwardSpeed + rightX * sideSpeed;
     agent.vy = forwardY * forwardSpeed + rightY * sideSpeed;
-    const track = closestOnTrack(agent.x, agent.y);
-    const onTrack = track.distance <= HALF_TRACK;
-    const drag = onTrack ? DRAG : OFFROAD_DRAG;
+    agent.previousX = agent.x;
+    agent.previousY = agent.y;
+    const drag = track.distance <= HALF_TRACK ? DRAG : OFFROAD_DRAG;
     agent.vx *= drag;
     agent.vy *= drag;
     agent.x += agent.vx;
     agent.y += agent.vy;
 
     const nextTrack = closestOnTrack(agent.x, agent.y);
-    const progressDelta = trackDelta(nextTrack.progress, agent.trackProgress);
-    agent.trackProgress = nextTrack.progress;
-    if (progressDelta > 0.05 && onTrack) {
-      agent.forwardProgress += Math.min(progressDelta, 18);
-      agent.lastProgressFrame = agent.age;
-      agent.fitness += progressDelta * 3.4;
-    } else if (progressDelta < -2) {
-      agent.fitness += progressDelta * 2.2;
+    const onTrack = nextTrack.distance <= HALF_TRACK;
+    if (!onTrack) {
+      agent.alive = false;
+      agent.fitness -= 900;
+      return;
     }
 
-    const headingError = Math.abs(normalizeAngle(nextTrack.angle - agent.angle));
-    if (onTrack) {
-      agent.offroadFrames = Math.max(0, agent.offroadFrames - 2);
-      agent.fitness += Math.max(0, 1 - headingError / 1.4) * (1.2 + speed * 0.22);
-    } else {
-      agent.offroadFrames += 1;
-      agent.fitness -= 4 + nextTrack.distance * 0.08;
+    const progressDelta = trackDelta(nextTrack.progress, agent.trackProgress);
+    agent.trackProgress = nextTrack.progress;
+    if (progressDelta > 0.05) {
+      agent.forwardProgress += Math.min(progressDelta, 18);
+    } else if (progressDelta < -2) {
+      agent.fitness += progressDelta * 3.8;
     }
+
+    agent.offroadFrames = 0;
 
     updateCheckpoint(agent);
     agent.stalledFrames = agent.age - agent.lastProgressFrame;
     agent.score = agent.laps * CHECKPOINTS.length + agent.checkpoints;
 
     if (
-      agent.offroadFrames > 115 ||
       agent.stalledFrames > 240 ||
       agent.age > MAX_AGE ||
       agent.x < -180 ||
@@ -2814,7 +2837,7 @@ function createFormulaCircuitGame() {
       agent.y > FORMULA_WORLD_HEIGHT + 180
     ) {
       agent.alive = false;
-      agent.fitness -= agent.offroadFrames > 115 ? 420 : 160;
+      agent.fitness -= 160;
     }
   }
 
@@ -2885,10 +2908,15 @@ function createFormulaCircuitGame() {
       const x = checkpoint.x - cameraX;
       const y = checkpoint.y - cameraY;
       if (x < -160 || x > WIDTH + 160 || y < -160 || y > HEIGHT + 160) continue;
-      targetCtx.fillStyle = index === START_INDEX ? "rgba(255,255,255,0.9)" : "rgba(242,193,78,0.72)";
+      const lateralX = -Math.sin(checkpoint.angle);
+      const lateralY = Math.cos(checkpoint.angle);
+      const half = checkpoint.lineHalfWidth;
+      targetCtx.strokeStyle = index === START_INDEX ? "rgba(255,255,255,0.95)" : "rgba(242,193,78,0.82)";
+      targetCtx.lineWidth = index === START_INDEX ? 5 : 3;
       targetCtx.beginPath();
-      targetCtx.arc(x, y, index === START_INDEX ? 8 : 5, 0, Math.PI * 2);
-      targetCtx.fill();
+      targetCtx.moveTo(x - lateralX * half, y - lateralY * half);
+      targetCtx.lineTo(x + lateralX * half, y + lateralY * half);
+      targetCtx.stroke();
     }
 
     const start = TRACK[START_INDEX];

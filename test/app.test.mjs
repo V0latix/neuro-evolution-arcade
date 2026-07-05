@@ -354,6 +354,14 @@ test("static app includes every primary control and asset reference", async () =
   assert.match(script, /targetWorld\.cameraX/);
   assert.match(script, /targetWorld\.cameraY/);
   assert.match(script, /function drawFormulaMiniMap/);
+  assert.match(script, /function crossedCheckpointLine/);
+  assert.match(script, /lineHalfWidth: TRACK_WIDTH \* 0\.62/);
+  assert.match(script, /agent\.alive = false;\n      agent\.fitness -= 900;/);
+  assert.doesNotMatch(script, /radius: index === START_INDEX/);
+  assert.doesNotMatch(script, /agent\.fitness \+= progressDelta \* 3\.4/);
+  assert.doesNotMatch(script, /bestNextCheckpointDistance/);
+  assert.doesNotMatch(script, /checkpointDistance/);
+  assert.doesNotMatch(script, /agent\.offroadFrames > 115/);
   assert.match(script, /const CHASSIS_WIDTH = 125/);
   assert.match(script, /const CHASSIS_HEIGHT = 40/);
   assert.match(script, /const WHEEL_RADIUS = 17/);

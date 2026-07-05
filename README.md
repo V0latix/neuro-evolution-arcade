@@ -86,9 +86,9 @@ at the same time, but cars are ghosts and do not collide with each other. The
 network observes forward speed, side slip, heading error, spin, off-track state,
 the next checkpoint in car-local coordinates, nearby curve direction, and four
 track sensors. Its four outputs are combinable gas, brake, left, and right
-commands. Fitness rewards checkpoints in order, completed laps, useful speed on
-track, and alignment with the racing line, while long off-track runs, reversing,
-and lack of progress end the attempt.
+commands. Positive fitness comes from crossing checkpoint lines in order and
+completing laps, so local centerline loops do not accumulate fitness. Leaving
+the track, reversing, or failing to progress ends the attempt.
 
 ## Next Game Ideas
 
