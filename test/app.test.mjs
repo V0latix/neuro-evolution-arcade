@@ -339,8 +339,9 @@ test("static app includes every primary control and asset reference", async () =
   assert.match(script, /outputLabels: \["gas", "brake"\]/);
   assert.match(script, /outputLabels: \["gas", "brake", "left", "right"\]/);
   assert.match(script, /const FORMULA_WORLD_WIDTH = 3600/);
-  assert.match(script, /const FORMULA_WORLD_HEIGHT = 2500/);
-  assert.match(script, /const MONZA_CENTERLINE = \[/);
+  assert.match(script, /const FORMULA_WORLD_HEIGHT = 2450/);
+  assert.match(script, /const MONZA_SVG_POINTS = \[/);
+  assert.match(script, /const MONZA_CENTERLINE = MONZA_SVG_POINTS\.map/);
   assert.match(script, /const MONZA_SAMPLE_STEPS = 8/);
   assert.match(script, /function buildSmoothFormulaTrack/);
   assert.match(script, /name: "Rettifilo"/);
@@ -355,7 +356,11 @@ test("static app includes every primary control and asset reference", async () =
   assert.match(script, /targetWorld\.cameraY/);
   assert.match(script, /function drawFormulaMiniMap/);
   assert.match(script, /function crossedCheckpointLine/);
-  assert.match(script, /lineHalfWidth: TRACK_WIDTH \* 0\.62/);
+  assert.match(script, /lineHalfWidth: TRACK_WIDTH \* 0\.92/);
+  assert.match(script, /bestScoreMetric\(nextAgents\)/);
+  assert.match(script, /lowerBestScoreIsBetter: true/);
+  assert.match(script, /formatFormulaTime/);
+  assert.match(script, /agent\.bestLapTime = agent\.bestLapTime > 0 \? Math\.min\(agent\.bestLapTime, agent\.lastLapTime\) : agent\.lastLapTime/);
   assert.match(script, /agent\.alive = false;\n      agent\.fitness -= 900;/);
   assert.doesNotMatch(script, /radius: index === START_INDEX/);
   assert.doesNotMatch(script, /agent\.fitness \+= progressDelta \* 3\.4/);

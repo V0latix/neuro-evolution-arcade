@@ -317,7 +317,7 @@ function stepAi() {
   for (const agent of agents) game.updateAgent(agent, world, frame);
 
   score = game.scoreMetric ? game.scoreMetric(agents, world) : Math.max(0, ...agents.map((agent) => agent.score));
-  bestScore = Math.max(bestScore, score);
+  updateBestScore(game.bestScoreMetric ? game.bestScoreMetric(agents, world, score) : score);
 
   const alive = agents.filter((agent) => agent.alive).length;
   if (alive === 0) evolve();
@@ -335,7 +335,7 @@ function stepSequentialAi() {
   if (agent.alive) game.updateAgent(agent, world, frame);
 
   score = game.sequentialScore ? game.sequentialScore(agents, world, agent) : agent.score;
-  bestScore = Math.max(bestScore, score);
+  updateBestScore(game.bestScoreMetric ? game.bestScoreMetric(agents, world, score) : score);
   leaderGenome = cloneGenome(agent.genome);
 
   if (agent.alive) return;
@@ -354,12 +354,22 @@ function stepHuman() {
   game.stepWorld(world, frame);
   game.updateHuman(humanAgent, world, frame);
   score = humanAgent ? humanAgent.score : 0;
-  bestScore = Math.max(bestScore, score);
+  updateBestScore(game.bestScoreMetric ? game.bestScoreMetric([humanAgent].filter(Boolean), world, score) : score);
 
   if (humanAgent && !humanAgent.alive) {
     running = false;
     ui.toggleRun.textContent = "Resume";
   }
+}
+
+function updateBestScore(candidate) {
+  if (candidate === null || candidate === undefined || Number.isNaN(candidate)) return;
+  if (game.lowerBestScoreIsBetter) {
+    if (candidate <= 0) return;
+    bestScore = bestScore > 0 ? Math.min(bestScore, candidate) : candidate;
+    return;
+  }
+  bestScore = Math.max(bestScore, candidate);
 }
 
 function step() {
@@ -474,8 +484,8 @@ function updateUi() {
   ui.generation.textContent = playMode === "human" ? "Human" : generation;
   ui.alive.textContent =
     playMode === "ai" && game.sequential ? `${(world?.activeAgentIndex || 0) + 1}/${agents.length}` : alive;
-  ui.score.textContent = score;
-  ui.bestScore.textContent = bestScore;
+  ui.score.textContent = game.formatScore ? game.formatScore(score) : score;
+  ui.bestScore.textContent = game.formatBestScore ? game.formatBestScore(bestScore) : bestScore;
   ui.bestFitness.textContent = playMode === "human" ? "-" : Math.round(bestFitness);
   ui.leaderFitness.textContent = playMode === "human" ? "-" : leader ? Math.round(leader.fitness) : 0;
   ui.distanceMetric.textContent = leader ? game.distanceMetric(leader, world) : 0;
@@ -2484,7 +2494,7 @@ function createHillClimbGame() {
 
 function createFormulaCircuitGame() {
   const FORMULA_WORLD_WIDTH = 3600;
-  const FORMULA_WORLD_HEIGHT = 2500;
+  const FORMULA_WORLD_HEIGHT = 2450;
   const TRACK_WIDTH = 118;
   const HALF_TRACK = TRACK_WIDTH / 2;
   const CAR_LENGTH = 28;
@@ -2503,38 +2513,50 @@ function createFormulaCircuitGame() {
   const MONZA_SAMPLE_STEPS = 8;
   const CAMERA_LEAD_X = 360;
   const CAMERA_LEAD_Y = 280;
-  const MONZA_CENTERLINE = [
-    { x: 2660, y: 2050, name: "Rettifilo" },
-    { x: 2140, y: 2050, name: "Rettifilo" },
-    { x: 1560, y: 2048, name: "Rettifilo" },
-    { x: 960, y: 2046, name: "Rettifilo" },
-    { x: 735, y: 1998, name: "Variante del Rettifilo" },
-    { x: 860, y: 1886, name: "Variante del Rettifilo" },
-    { x: 675, y: 1765, name: "Variante del Rettifilo" },
-    { x: 526, y: 1548, name: "Curva Grande" },
-    { x: 630, y: 1238, name: "Curva Grande" },
-    { x: 915, y: 1056, name: "Curva Grande" },
-    { x: 1315, y: 1000, name: "Curva Grande" },
-    { x: 1512, y: 976, name: "Variante della Roggia" },
-    { x: 1640, y: 1096, name: "Variante della Roggia" },
-    { x: 1798, y: 998, name: "Variante della Roggia" },
-    { x: 1985, y: 970, name: "Variante della Roggia" },
-    { x: 2242, y: 1002, name: "Lesmo 1" },
-    { x: 2396, y: 1138, name: "Lesmo 1" },
-    { x: 2252, y: 1290, name: "Lesmo 1" },
-    { x: 2316, y: 1454, name: "Lesmo 2" },
-    { x: 2526, y: 1544, name: "Lesmo 2" },
-    { x: 2864, y: 1698, name: "Serraglio" },
-    { x: 3178, y: 1842, name: "Serraglio" },
-    { x: 3318, y: 1934, name: "Variante Ascari" },
-    { x: 3182, y: 2052, name: "Variante Ascari" },
-    { x: 3372, y: 2154, name: "Variante Ascari" },
-    { x: 3505, y: 2075, name: "Variante Ascari" },
-    { x: 3410, y: 2260, name: "Curva Alboreto" },
-    { x: 3110, y: 2370, name: "Curva Alboreto" },
-    { x: 2760, y: 2302, name: "Curva Alboreto" },
-    { x: 2562, y: 2142, name: "Curva Alboreto" },
+  const MONZA_SVG_ORIGIN_X = 660;
+  const MONZA_SVG_ORIGIN_Y = 360;
+  const MONZA_SCALE_X = 2.45;
+  const MONZA_SCALE_Y = 3.18;
+  const MONZA_OFFSET_X = 260;
+  const MONZA_OFFSET_Y = 200;
+  const MONZA_SVG_POINTS = [
+    { sx: 1543, sy: 997, name: "Rettifilo" },
+    { sx: 1375, sy: 1000, name: "Rettifilo" },
+    { sx: 1184, sy: 1003, name: "Rettifilo" },
+    { sx: 1160, sy: 979, name: "Variante del Rettifilo" },
+    { sx: 1096, sy: 1002, name: "Variante del Rettifilo" },
+    { sx: 1047, sy: 1007, name: "Variante del Rettifilo" },
+    { sx: 933, sy: 1000, name: "Curva Grande" },
+    { sx: 870, sy: 963, name: "Curva Grande" },
+    { sx: 822, sy: 895, name: "Curva Grande" },
+    { sx: 786, sy: 747, name: "Curva Grande" },
+    { sx: 766, sy: 624, name: "Curva Grande" },
+    { sx: 736, sy: 598, name: "Variante della Roggia" },
+    { sx: 677, sy: 468, name: "Variante della Roggia" },
+    { sx: 666, sy: 409, name: "Variante della Roggia" },
+    { sx: 698, sy: 381, name: "Variante della Roggia" },
+    { sx: 840, sy: 354, name: "Lesmo 1" },
+    { sx: 859, sy: 366, name: "Lesmo 1" },
+    { sx: 991, sy: 548, name: "Lesmo 1" },
+    { sx: 1123, sy: 673, name: "Lesmo 2" },
+    { sx: 1268, sy: 805, name: "Lesmo 2" },
+    { sx: 1325, sy: 804, name: "Serraglio" },
+    { sx: 1377, sy: 818, name: "Serraglio" },
+    { sx: 1396, sy: 834, name: "Variante Ascari" },
+    { sx: 1436, sy: 838, name: "Variante Ascari" },
+    { sx: 1706, sy: 837, name: "Variante Ascari" },
+    { sx: 1968, sy: 838, name: "Variante Ascari" },
+    { sx: 1984, sy: 888, name: "Curva Alboreto" },
+    { sx: 1973, sy: 925, name: "Curva Alboreto" },
+    { sx: 1919, sy: 968, name: "Curva Alboreto" },
+    { sx: 1814, sy: 988, name: "Curva Alboreto" },
+    { sx: 1650, sy: 995, name: "Curva Alboreto" },
   ];
+  const MONZA_CENTERLINE = MONZA_SVG_POINTS.map((point) => ({
+    x: Math.round(MONZA_OFFSET_X + (point.sx - MONZA_SVG_ORIGIN_X) * MONZA_SCALE_X),
+    y: Math.round(MONZA_OFFSET_Y + (point.sy - MONZA_SVG_ORIGIN_Y) * MONZA_SCALE_Y),
+    name: point.name,
+  }));
   const TRACK = buildSmoothFormulaTrack(MONZA_CENTERLINE);
 
   function catmullRom(p0, p1, p2, p3, t) {
@@ -2586,7 +2608,7 @@ function createFormulaCircuitGame() {
     y: point.y,
     name: point.name,
     angle: closestOnTrack(point.x, point.y).angle,
-    lineHalfWidth: TRACK_WIDTH * 0.62,
+    lineHalfWidth: TRACK_WIDTH * 0.92,
     isStart: index === START_INDEX,
   }));
 
@@ -2698,6 +2720,9 @@ function createFormulaCircuitGame() {
     agent.trackProgress = closestOnTrack(agent.x, agent.y).progress;
     agent.forwardProgress = 0;
     agent.lastProgressFrame = 0;
+    agent.lapStartFrame = 0;
+    agent.lastLapTime = 0;
+    agent.bestLapTime = 0;
     agent.offroadFrames = 0;
     agent.stalledFrames = 0;
     agent.controls = { gas: false, brake: false, left: false, right: false };
@@ -2720,8 +2745,16 @@ function createFormulaCircuitGame() {
 
     if (agent.nextCheckpoint === 1) {
       agent.laps += 1;
+      agent.lastLapTime = agent.age - agent.lapStartFrame;
+      agent.bestLapTime = agent.bestLapTime > 0 ? Math.min(agent.bestLapTime, agent.lastLapTime) : agent.lastLapTime;
+      agent.lapStartFrame = agent.age;
       agent.fitness += 12000;
     }
+  }
+
+  function formatFormulaTime(frames) {
+    if (!frames || frames <= 0) return "-";
+    return `${(frames / 60).toFixed(2)}s`;
   }
 
   function inputsFor(agent) {
@@ -3114,6 +3147,14 @@ function createFormulaCircuitGame() {
     },
     scoreMetric(nextAgents) {
       return Math.max(0, ...nextAgents.map((agent) => agent.score));
+    },
+    bestScoreMetric(nextAgents) {
+      const lapTimes = nextAgents.map((agent) => agent.bestLapTime).filter((time) => time > 0);
+      return lapTimes.length ? Math.min(...lapTimes) : null;
+    },
+    lowerBestScoreIsBetter: true,
+    formatBestScore(value) {
+      return formatFormulaTime(value);
     },
     distanceMetric(agent) {
       return agent ? agent.score : 0;

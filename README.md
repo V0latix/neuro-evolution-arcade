@@ -86,9 +86,13 @@ at the same time, but cars are ghosts and do not collide with each other. The
 network observes forward speed, side slip, heading error, spin, off-track state,
 the next checkpoint in car-local coordinates, nearby curve direction, and four
 track sensors. Its four outputs are combinable gas, brake, left, and right
-commands. Positive fitness comes from crossing checkpoint lines in order and
-completing laps, so local centerline loops do not accumulate fitness. Leaving
-the track, reversing, or failing to progress ends the attempt.
+commands. The Monza layout uses map-derived control points for the main
+straight, Rettifilo, Curva Grande, Roggia, Lesmo, Serraglio, Ascari, and
+Alboreto/Parabolica sequence. Positive fitness comes from crossing wide
+checkpoint lines in order and completing laps, so local centerline loops do not
+accumulate fitness. Leaving the track, reversing, or failing to progress ends
+the attempt. Once a car completes a lap, Formula Circuit's best score is the
+fastest completed lap time.
 
 ## Next Game Ideas
 
