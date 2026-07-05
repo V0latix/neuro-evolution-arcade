@@ -2500,44 +2500,66 @@ function createFormulaCircuitGame() {
   const SENSOR_RANGE = 190;
   const SENSOR_STEP = 14;
   const START_INDEX = 0;
+  const MONZA_SAMPLE_STEPS = 8;
   const CAMERA_LEAD_X = 360;
   const CAMERA_LEAD_Y = 280;
   const MONZA_CENTERLINE = [
-    { x: 1240, y: 2040, name: "Rettifilo" },
-    { x: 1900, y: 2040, name: "Rettifilo" },
-    { x: 2520, y: 2042, name: "Rettifilo" },
-    { x: 3060, y: 2048, name: "Rettifilo" },
-    { x: 3260, y: 2144, name: "Variante del Rettifilo" },
-    { x: 3412, y: 2058, name: "Variante del Rettifilo" },
-    { x: 3310, y: 1886, name: "Variante del Rettifilo" },
-    { x: 3110, y: 1655, name: "Curva Grande" },
-    { x: 2790, y: 1456, name: "Curva Grande" },
-    { x: 2390, y: 1350, name: "Curva Grande" },
-    { x: 2180, y: 1245, name: "Variante della Roggia" },
-    { x: 2030, y: 1092, name: "Variante della Roggia" },
-    { x: 1848, y: 1195, name: "Variante della Roggia" },
-    { x: 1692, y: 1012, name: "Variante della Roggia" },
-    { x: 1455, y: 898, name: "Lesmo 1" },
-    { x: 1225, y: 940, name: "Lesmo 1" },
-    { x: 1120, y: 1120, name: "Lesmo 1" },
-    { x: 920, y: 1180, name: "Lesmo 2" },
-    { x: 805, y: 1368, name: "Lesmo 2" },
-    { x: 922, y: 1548, name: "Serraglio" },
-    { x: 1160, y: 1712, name: "Serraglio" },
-    { x: 1365, y: 1888, name: "Variante Ascari" },
-    { x: 1240, y: 2052, name: "Variante Ascari" },
-    { x: 1428, y: 2176, name: "Variante Ascari" },
-    { x: 1695, y: 2078, name: "Variante Ascari" },
-    { x: 2140, y: 1902, name: "Rettilineo Opposto" },
-    { x: 2610, y: 1830, name: "Rettilineo Opposto" },
-    { x: 3058, y: 1938, name: "Curva Alboreto" },
-    { x: 3296, y: 2105, name: "Curva Alboreto" },
-    { x: 3185, y: 2290, name: "Curva Alboreto" },
-    { x: 2760, y: 2375, name: "Curva Alboreto" },
-    { x: 2200, y: 2242, name: "Curva Alboreto" },
-    { x: 1660, y: 2105, name: "Rettifilo" },
+    { x: 2660, y: 2050, name: "Rettifilo" },
+    { x: 2140, y: 2050, name: "Rettifilo" },
+    { x: 1560, y: 2048, name: "Rettifilo" },
+    { x: 960, y: 2046, name: "Rettifilo" },
+    { x: 735, y: 1998, name: "Variante del Rettifilo" },
+    { x: 860, y: 1886, name: "Variante del Rettifilo" },
+    { x: 675, y: 1765, name: "Variante del Rettifilo" },
+    { x: 526, y: 1548, name: "Curva Grande" },
+    { x: 630, y: 1238, name: "Curva Grande" },
+    { x: 915, y: 1056, name: "Curva Grande" },
+    { x: 1315, y: 1000, name: "Curva Grande" },
+    { x: 1512, y: 976, name: "Variante della Roggia" },
+    { x: 1640, y: 1096, name: "Variante della Roggia" },
+    { x: 1798, y: 998, name: "Variante della Roggia" },
+    { x: 1985, y: 970, name: "Variante della Roggia" },
+    { x: 2242, y: 1002, name: "Lesmo 1" },
+    { x: 2396, y: 1138, name: "Lesmo 1" },
+    { x: 2252, y: 1290, name: "Lesmo 1" },
+    { x: 2316, y: 1454, name: "Lesmo 2" },
+    { x: 2526, y: 1544, name: "Lesmo 2" },
+    { x: 2864, y: 1698, name: "Serraglio" },
+    { x: 3178, y: 1842, name: "Serraglio" },
+    { x: 3318, y: 1934, name: "Variante Ascari" },
+    { x: 3182, y: 2052, name: "Variante Ascari" },
+    { x: 3372, y: 2154, name: "Variante Ascari" },
+    { x: 3505, y: 2075, name: "Variante Ascari" },
+    { x: 3410, y: 2260, name: "Curva Alboreto" },
+    { x: 3110, y: 2370, name: "Curva Alboreto" },
+    { x: 2760, y: 2302, name: "Curva Alboreto" },
+    { x: 2562, y: 2142, name: "Curva Alboreto" },
   ];
-  const TRACK = MONZA_CENTERLINE;
+  const TRACK = buildSmoothFormulaTrack(MONZA_CENTERLINE);
+
+  function catmullRom(p0, p1, p2, p3, t) {
+    const t2 = t * t;
+    const t3 = t2 * t;
+    return {
+      x: 0.5 * ((2 * p1.x) + (-p0.x + p2.x) * t + (2 * p0.x - 5 * p1.x + 4 * p2.x - p3.x) * t2 + (-p0.x + 3 * p1.x - 3 * p2.x + p3.x) * t3),
+      y: 0.5 * ((2 * p1.y) + (-p0.y + p2.y) * t + (2 * p0.y - 5 * p1.y + 4 * p2.y - p3.y) * t2 + (-p0.y + 3 * p1.y - 3 * p2.y + p3.y) * t3),
+    };
+  }
+
+  function buildSmoothFormulaTrack(points) {
+    const smoothed = [];
+    for (let index = 0; index < points.length; index += 1) {
+      const p0 = points[(index - 1 + points.length) % points.length];
+      const p1 = points[index];
+      const p2 = points[(index + 1) % points.length];
+      const p3 = points[(index + 2) % points.length];
+      for (let step = 0; step < MONZA_SAMPLE_STEPS; step += 1) {
+        const point = catmullRom(p0, p1, p2, p3, step / MONZA_SAMPLE_STEPS);
+        smoothed.push({ ...point, name: p1.name });
+      }
+    }
+    return smoothed;
+  }
 
   const SEGMENTS = TRACK.map((point, index) => {
     const next = TRACK[(index + 1) % TRACK.length];
@@ -2559,7 +2581,7 @@ function createFormulaCircuitGame() {
     runningLength += segment.length;
   }
   const TRACK_LENGTH = runningLength;
-  const CHECKPOINTS = TRACK.map((point, index) => ({
+  const CHECKPOINTS = MONZA_CENTERLINE.map((point, index) => ({
     x: point.x,
     y: point.y,
     name: point.name,

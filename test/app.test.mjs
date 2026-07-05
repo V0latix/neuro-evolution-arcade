@@ -341,6 +341,8 @@ test("static app includes every primary control and asset reference", async () =
   assert.match(script, /const FORMULA_WORLD_WIDTH = 3600/);
   assert.match(script, /const FORMULA_WORLD_HEIGHT = 2500/);
   assert.match(script, /const MONZA_CENTERLINE = \[/);
+  assert.match(script, /const MONZA_SAMPLE_STEPS = 8/);
+  assert.match(script, /function buildSmoothFormulaTrack/);
   assert.match(script, /name: "Rettifilo"/);
   assert.match(script, /name: "Variante del Rettifilo"/);
   assert.match(script, /name: "Curva Grande"/);
