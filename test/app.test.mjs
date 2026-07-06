@@ -340,6 +340,9 @@ test("static app includes every primary control and asset reference", async () =
   assert.match(script, /outputLabels: \["gas", "brake", "left", "right"\]/);
   assert.match(script, /const FORMULA_WORLD_WIDTH = 3600/);
   assert.match(script, /const FORMULA_WORLD_HEIGHT = 2450/);
+  assert.match(script, /const TRACK_WIDTH = 92/);
+  assert.match(script, /const CAR_LENGTH = 30/);
+  assert.match(script, /const CAR_WIDTH = 16/);
   assert.match(script, /const MONZA_SVG_POINTS = \[/);
   assert.match(script, /const MONZA_CENTERLINE = MONZA_SVG_POINTS\.map/);
   assert.match(script, /const MONZA_SAMPLE_STEPS = 8/);
@@ -356,7 +359,14 @@ test("static app includes every primary control and asset reference", async () =
   assert.match(script, /targetWorld\.cameraY/);
   assert.match(script, /function drawFormulaMiniMap/);
   assert.match(script, /function crossedCheckpointLine/);
-  assert.match(script, /lineHalfWidth: TRACK_WIDTH \* 0\.92/);
+  assert.match(script, /lineHalfWidth: TRACK_WIDTH \* 0\.82/);
+  assert.match(script, /const POST_LAP_TARGET_SPLIT = 150/);
+  assert.match(script, /function checkpointSpeedBonus/);
+  assert.match(script, /agent\.lastCheckpointFrame = 0/);
+  assert.match(script, /agent\.lastCheckpointSplit = 0/);
+  assert.match(script, /agent\.bestCheckpointSplit = 0/);
+  assert.match(script, /agent\.laps > 0 \? checkpointSpeedBonus\(split\) : PRE_LAP_CHECKPOINT_BONUS/);
+  assert.match(script, /const lapSpeedBonus = Math\.max\(0, TARGET_LAP_TIME - agent\.lastLapTime\) \* LAP_SPEED_MULTIPLIER/);
   assert.match(script, /bestScoreMetric\(nextAgents\)/);
   assert.match(script, /lowerBestScoreIsBetter: true/);
   assert.match(script, /formatFormulaTime/);

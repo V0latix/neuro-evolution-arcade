@@ -88,11 +88,14 @@ the next checkpoint in car-local coordinates, nearby curve direction, and four
 track sensors. Its four outputs are combinable gas, brake, left, and right
 commands. The Monza layout uses map-derived control points for the main
 straight, Rettifilo, Curva Grande, Roggia, Lesmo, Serraglio, Ascari, and
-Alboreto/Parabolica sequence. Positive fitness comes from crossing wide
-checkpoint lines in order and completing laps, so local centerline loops do not
-accumulate fitness. Leaving the track, reversing, or failing to progress ends
-the attempt. Once a car completes a lap, Formula Circuit's best score is the
-fastest completed lap time.
+Alboreto/Parabolica sequence, with tighter chicane points and a narrower
+track-to-car ratio so cars must drive the chicanes instead of cutting through
+them. Before a first completed lap, positive fitness mostly comes from crossing
+checkpoint lines in order. After a car has completed a lap, fast checkpoint
+splits and short lap times are weighted much more heavily. Local centerline
+loops do not accumulate fitness, and leaving the track, reversing, or failing
+to progress ends the attempt. Once a car completes a lap, Formula Circuit's
+best score is the fastest completed lap time.
 
 ## Next Game Ideas
 

@@ -2495,10 +2495,10 @@ function createHillClimbGame() {
 function createFormulaCircuitGame() {
   const FORMULA_WORLD_WIDTH = 3600;
   const FORMULA_WORLD_HEIGHT = 2450;
-  const TRACK_WIDTH = 118;
+  const TRACK_WIDTH = 92;
   const HALF_TRACK = TRACK_WIDTH / 2;
-  const CAR_LENGTH = 28;
-  const CAR_WIDTH = 15;
+  const CAR_LENGTH = 30;
+  const CAR_WIDTH = 16;
   const MAX_SPEED = 9.8;
   const ACCELERATION = 0.2;
   const BRAKE_FORCE = 0.2;
@@ -2510,6 +2510,13 @@ function createFormulaCircuitGame() {
   const SENSOR_RANGE = 190;
   const SENSOR_STEP = 14;
   const START_INDEX = 0;
+  const PRE_LAP_CHECKPOINT_BONUS = 3600;
+  const POST_LAP_BASE_CHECKPOINT_BONUS = 1800;
+  const POST_LAP_TARGET_SPLIT = 150;
+  const CHECKPOINT_SPEED_MULTIPLIER = 44;
+  const TARGET_LAP_TIME = 2200;
+  const LAP_COMPLETION_BONUS = 12000;
+  const LAP_SPEED_MULTIPLIER = 9;
   const MONZA_SAMPLE_STEPS = 8;
   const CAMERA_LEAD_X = 360;
   const CAMERA_LEAD_Y = 280;
@@ -2523,18 +2530,22 @@ function createFormulaCircuitGame() {
     { sx: 1543, sy: 997, name: "Rettifilo" },
     { sx: 1375, sy: 1000, name: "Rettifilo" },
     { sx: 1184, sy: 1003, name: "Rettifilo" },
-    { sx: 1160, sy: 979, name: "Variante del Rettifilo" },
-    { sx: 1096, sy: 1002, name: "Variante del Rettifilo" },
+    { sx: 1166, sy: 1007, name: "Variante del Rettifilo" },
+    { sx: 1140, sy: 956, name: "Variante del Rettifilo" },
+    { sx: 1087, sy: 957, name: "Variante del Rettifilo" },
+    { sx: 1118, sy: 1008, name: "Variante del Rettifilo" },
     { sx: 1047, sy: 1007, name: "Variante del Rettifilo" },
     { sx: 933, sy: 1000, name: "Curva Grande" },
     { sx: 870, sy: 963, name: "Curva Grande" },
     { sx: 822, sy: 895, name: "Curva Grande" },
     { sx: 786, sy: 747, name: "Curva Grande" },
     { sx: 766, sy: 624, name: "Curva Grande" },
-    { sx: 736, sy: 598, name: "Variante della Roggia" },
-    { sx: 677, sy: 468, name: "Variante della Roggia" },
+    { sx: 735, sy: 605, name: "Variante della Roggia" },
+    { sx: 695, sy: 560, name: "Variante della Roggia" },
+    { sx: 706, sy: 505, name: "Variante della Roggia" },
+    { sx: 657, sy: 456, name: "Variante della Roggia" },
     { sx: 666, sy: 409, name: "Variante della Roggia" },
-    { sx: 698, sy: 381, name: "Variante della Roggia" },
+    { sx: 710, sy: 382, name: "Variante della Roggia" },
     { sx: 840, sy: 354, name: "Lesmo 1" },
     { sx: 859, sy: 366, name: "Lesmo 1" },
     { sx: 991, sy: 548, name: "Lesmo 1" },
@@ -2542,8 +2553,11 @@ function createFormulaCircuitGame() {
     { sx: 1268, sy: 805, name: "Lesmo 2" },
     { sx: 1325, sy: 804, name: "Serraglio" },
     { sx: 1377, sy: 818, name: "Serraglio" },
-    { sx: 1396, sy: 834, name: "Variante Ascari" },
-    { sx: 1436, sy: 838, name: "Variante Ascari" },
+    { sx: 1396, sy: 850, name: "Variante Ascari" },
+    { sx: 1435, sy: 807, name: "Variante Ascari" },
+    { sx: 1490, sy: 824, name: "Variante Ascari" },
+    { sx: 1532, sy: 858, name: "Variante Ascari" },
+    { sx: 1600, sy: 835, name: "Variante Ascari" },
     { sx: 1706, sy: 837, name: "Variante Ascari" },
     { sx: 1968, sy: 838, name: "Variante Ascari" },
     { sx: 1984, sy: 888, name: "Curva Alboreto" },
@@ -2608,7 +2622,7 @@ function createFormulaCircuitGame() {
     y: point.y,
     name: point.name,
     angle: closestOnTrack(point.x, point.y).angle,
-    lineHalfWidth: TRACK_WIDTH * 0.92,
+    lineHalfWidth: TRACK_WIDTH * 0.82,
     isStart: index === START_INDEX,
   }));
 
@@ -2723,6 +2737,9 @@ function createFormulaCircuitGame() {
     agent.lapStartFrame = 0;
     agent.lastLapTime = 0;
     agent.bestLapTime = 0;
+    agent.lastCheckpointFrame = 0;
+    agent.lastCheckpointSplit = 0;
+    agent.bestCheckpointSplit = 0;
     agent.offroadFrames = 0;
     agent.stalledFrames = 0;
     agent.controls = { gas: false, brake: false, left: false, right: false };
@@ -2733,13 +2750,22 @@ function createFormulaCircuitGame() {
     return CHECKPOINTS[agent.nextCheckpoint];
   }
 
+  function checkpointSpeedBonus(split) {
+    return POST_LAP_BASE_CHECKPOINT_BONUS + Math.max(0, POST_LAP_TARGET_SPLIT - split) * CHECKPOINT_SPEED_MULTIPLIER;
+  }
+
   function updateCheckpoint(agent) {
     const checkpoint = checkpointTarget(agent);
     if (!crossedCheckpointLine(agent, checkpoint)) return;
 
+    const split = Math.max(1, agent.age - agent.lastCheckpointFrame);
+    agent.lastCheckpointSplit = split;
+    agent.bestCheckpointSplit = agent.bestCheckpointSplit > 0 ? Math.min(agent.bestCheckpointSplit, split) : split;
+    agent.lastCheckpointFrame = agent.age;
     agent.checkpoints += 1;
     agent.score = agent.laps * CHECKPOINTS.length + agent.checkpoints;
-    agent.fitness += 2800 + Math.max(0, MAX_AGE - agent.age) * 0.08;
+    const checkpointBonus = agent.laps > 0 ? checkpointSpeedBonus(split) : PRE_LAP_CHECKPOINT_BONUS;
+    agent.fitness += checkpointBonus;
     agent.lastProgressFrame = agent.age;
     agent.nextCheckpoint = (agent.nextCheckpoint + 1) % CHECKPOINTS.length;
 
@@ -2748,7 +2774,8 @@ function createFormulaCircuitGame() {
       agent.lastLapTime = agent.age - agent.lapStartFrame;
       agent.bestLapTime = agent.bestLapTime > 0 ? Math.min(agent.bestLapTime, agent.lastLapTime) : agent.lastLapTime;
       agent.lapStartFrame = agent.age;
-      agent.fitness += 12000;
+      const lapSpeedBonus = Math.max(0, TARGET_LAP_TIME - agent.lastLapTime) * LAP_SPEED_MULTIPLIER;
+      agent.fitness += LAP_COMPLETION_BONUS + lapSpeedBonus;
     }
   }
 
