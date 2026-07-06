@@ -343,12 +343,16 @@ test("static app includes every primary control and asset reference", async () =
   assert.match(script, /const TRACK_WIDTH = 92/);
   assert.match(script, /const CAR_LENGTH = 30/);
   assert.match(script, /const CAR_WIDTH = 16/);
-  assert.match(script, /const MONZA_SVG_POINTS = \[/);
-  assert.match(script, /const MONZA_CENTERLINE = MONZA_SVG_POINTS\.map/);
+  assert.match(script, /const MONZA_BITMAP_POINTS = \[/);
+  assert.match(script, /const MONZA_CENTERLINE = MONZA_BITMAP_POINTS\.map/);
   assert.match(script, /const MONZA_SAMPLE_STEPS = 8/);
   assert.match(script, /function buildSmoothFormulaTrack/);
   assert.match(script, /name: "Rettifilo"/);
   assert.match(script, /name: "Variante del Rettifilo"/);
+  assert.doesNotMatch(script, /sx: 1118, sy: 1008, name: "Variante del Rettifilo"/);
+  assert.match(script, /sx: 303, sy: 427, name: "Variante del Rettifilo"/);
+  assert.match(script, /sx: 292, sy: 407, name: "Variante del Rettifilo"/);
+  assert.match(script, /sx: 270, sy: 425, name: "Variante del Rettifilo"/);
   assert.match(script, /name: "Curva Grande"/);
   assert.match(script, /name: "Variante della Roggia"/);
   assert.match(script, /name: "Lesmo 1"/);

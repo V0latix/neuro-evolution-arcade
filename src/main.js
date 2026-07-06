@@ -2520,55 +2520,50 @@ function createFormulaCircuitGame() {
   const MONZA_SAMPLE_STEPS = 8;
   const CAMERA_LEAD_X = 360;
   const CAMERA_LEAD_Y = 280;
-  const MONZA_SVG_ORIGIN_X = 660;
-  const MONZA_SVG_ORIGIN_Y = 360;
-  const MONZA_SCALE_X = 2.45;
-  const MONZA_SCALE_Y = 3.18;
-  const MONZA_OFFSET_X = 260;
-  const MONZA_OFFSET_Y = 200;
-  const MONZA_SVG_POINTS = [
-    { sx: 1543, sy: 997, name: "Rettifilo" },
-    { sx: 1375, sy: 1000, name: "Rettifilo" },
-    { sx: 1184, sy: 1003, name: "Rettifilo" },
-    { sx: 1166, sy: 1007, name: "Variante del Rettifilo" },
-    { sx: 1140, sy: 956, name: "Variante del Rettifilo" },
-    { sx: 1087, sy: 957, name: "Variante del Rettifilo" },
-    { sx: 1118, sy: 1008, name: "Variante del Rettifilo" },
-    { sx: 1047, sy: 1007, name: "Variante del Rettifilo" },
-    { sx: 933, sy: 1000, name: "Curva Grande" },
-    { sx: 870, sy: 963, name: "Curva Grande" },
-    { sx: 822, sy: 895, name: "Curva Grande" },
-    { sx: 786, sy: 747, name: "Curva Grande" },
-    { sx: 766, sy: 624, name: "Curva Grande" },
-    { sx: 735, sy: 605, name: "Variante della Roggia" },
-    { sx: 695, sy: 560, name: "Variante della Roggia" },
-    { sx: 706, sy: 505, name: "Variante della Roggia" },
-    { sx: 657, sy: 456, name: "Variante della Roggia" },
-    { sx: 666, sy: 409, name: "Variante della Roggia" },
-    { sx: 710, sy: 382, name: "Variante della Roggia" },
-    { sx: 840, sy: 354, name: "Lesmo 1" },
-    { sx: 859, sy: 366, name: "Lesmo 1" },
-    { sx: 991, sy: 548, name: "Lesmo 1" },
-    { sx: 1123, sy: 673, name: "Lesmo 2" },
-    { sx: 1268, sy: 805, name: "Lesmo 2" },
-    { sx: 1325, sy: 804, name: "Serraglio" },
-    { sx: 1377, sy: 818, name: "Serraglio" },
-    { sx: 1396, sy: 850, name: "Variante Ascari" },
-    { sx: 1435, sy: 807, name: "Variante Ascari" },
-    { sx: 1490, sy: 824, name: "Variante Ascari" },
-    { sx: 1532, sy: 858, name: "Variante Ascari" },
-    { sx: 1600, sy: 835, name: "Variante Ascari" },
-    { sx: 1706, sy: 837, name: "Variante Ascari" },
-    { sx: 1968, sy: 838, name: "Variante Ascari" },
-    { sx: 1984, sy: 888, name: "Curva Alboreto" },
-    { sx: 1973, sy: 925, name: "Curva Alboreto" },
-    { sx: 1919, sy: 968, name: "Curva Alboreto" },
-    { sx: 1814, sy: 988, name: "Curva Alboreto" },
-    { sx: 1650, sy: 995, name: "Curva Alboreto" },
+  const MONZA_BITMAP_ORIGIN_X = 23;
+  const MONZA_BITMAP_ORIGIN_Y = 31;
+  const MONZA_BITMAP_SCALE_X = 3.75;
+  const MONZA_BITMAP_SCALE_Y = 4.85;
+  const MONZA_BITMAP_OFFSET_X = 300;
+  const MONZA_BITMAP_OFFSET_Y = 200;
+  const MONZA_BITMAP_POINTS = [
+    { sx: 705, sy: 427, name: "Rettifilo" },
+    { sx: 600, sy: 427, name: "Rettifilo" },
+    { sx: 480, sy: 427, name: "Rettifilo" },
+    { sx: 340, sy: 427, name: "Rettifilo" },
+    { sx: 303, sy: 427, name: "Variante del Rettifilo" },
+    { sx: 292, sy: 407, name: "Variante del Rettifilo" },
+    { sx: 281, sy: 404, name: "Variante del Rettifilo" },
+    { sx: 270, sy: 425, name: "Variante del Rettifilo" },
+    { sx: 210, sy: 438, name: "Curva Grande" },
+    { sx: 145, sy: 424, name: "Curva Grande" },
+    { sx: 112, sy: 374, name: "Curva Grande" },
+    { sx: 100, sy: 300, name: "Curva Grande" },
+    { sx: 90, sy: 230, name: "Curva Grande" },
+    { sx: 73, sy: 210, name: "Variante della Roggia" },
+    { sx: 56, sy: 145, name: "Variante della Roggia" },
+    { sx: 28, sy: 92, name: "Variante della Roggia" },
+    { sx: 28, sy: 60, name: "Variante della Roggia" },
+    { sx: 52, sy: 47, name: "Lesmo 1" },
+    { sx: 122, sy: 36, name: "Lesmo 1" },
+    { sx: 145, sy: 45, name: "Lesmo 1" },
+    { sx: 190, sy: 125, name: "Lesmo 2" },
+    { sx: 238, sy: 195, name: "Lesmo 2" },
+    { sx: 285, sy: 235, name: "Serraglio" },
+    { sx: 350, sy: 292, name: "Serraglio" },
+    { sx: 402, sy: 320, name: "Variante Ascari" },
+    { sx: 423, sy: 317, name: "Variante Ascari" },
+    { sx: 448, sy: 333, name: "Variante Ascari" },
+    { sx: 520, sy: 334, name: "Variante Ascari" },
+    { sx: 650, sy: 334, name: "Variante Ascari" },
+    { sx: 760, sy: 336, name: "Curva Alboreto" },
+    { sx: 795, sy: 350, name: "Curva Alboreto" },
+    { sx: 775, sy: 390, name: "Curva Alboreto" },
+    { sx: 710, sy: 420, name: "Curva Alboreto" },
   ];
-  const MONZA_CENTERLINE = MONZA_SVG_POINTS.map((point) => ({
-    x: Math.round(MONZA_OFFSET_X + (point.sx - MONZA_SVG_ORIGIN_X) * MONZA_SCALE_X),
-    y: Math.round(MONZA_OFFSET_Y + (point.sy - MONZA_SVG_ORIGIN_Y) * MONZA_SCALE_Y),
+  const MONZA_CENTERLINE = MONZA_BITMAP_POINTS.map((point) => ({
+    x: Math.round(MONZA_BITMAP_OFFSET_X + (point.sx - MONZA_BITMAP_ORIGIN_X) * MONZA_BITMAP_SCALE_X),
+    y: Math.round(MONZA_BITMAP_OFFSET_Y + (point.sy - MONZA_BITMAP_ORIGIN_Y) * MONZA_BITMAP_SCALE_Y),
     name: point.name,
   }));
   const TRACK = buildSmoothFormulaTrack(MONZA_CENTERLINE);
