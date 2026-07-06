@@ -2519,6 +2519,7 @@ function createFormulaCircuitGame() {
   const LAP_COMPLETION_BONUS = 12000;
   const LAP_SPEED_MULTIPLIER = 9;
   const MONZA_SAMPLE_STEPS = 8;
+  const MONZA_CORNER_SMOOTHING = 0.18;
   const CAMERA_LEAD_X = 360;
   const CAMERA_LEAD_Y = 280;
   const MONZA_BITMAP_ORIGIN_X = 23;
@@ -2569,11 +2570,34 @@ function createFormulaCircuitGame() {
   }));
   const TRACK = buildSmoothFormulaTrack(MONZA_CENTERLINE);
 
+  function smoothedFormulaCorner(previous, point, next, amount) {
+    return {
+      entry: {
+        x: point.x + (previous.x - point.x) * amount,
+        y: point.y + (previous.y - point.y) * amount,
+      },
+      exit: {
+        x: point.x + (next.x - point.x) * amount,
+        y: point.y + (next.y - point.y) * amount,
+      },
+    };
+  }
+
   function buildSmoothFormulaTrack(points) {
-    const smoothed = [];
+    const rounded = [];
     for (let index = 0; index < points.length; index += 1) {
-      const p1 = points[index];
-      const p2 = points[(index + 1) % points.length];
+      const previous = points[(index - 1 + points.length) % points.length];
+      const point = points[index];
+      const next = points[(index + 1) % points.length];
+      const entry = smoothedFormulaCorner(previous, point, next, MONZA_CORNER_SMOOTHING);
+      rounded.push({ ...entry.entry, name: point.name });
+      rounded.push({ ...entry.exit, name: point.name });
+    }
+
+    const smoothed = [];
+    for (let index = 0; index < rounded.length; index += 1) {
+      const p1 = rounded[index];
+      const p2 = rounded[(index + 1) % rounded.length];
       for (let step = 0; step < MONZA_SAMPLE_STEPS; step += 1) {
         const t = step / MONZA_SAMPLE_STEPS;
         const point = {
@@ -3076,7 +3100,7 @@ function createFormulaCircuitGame() {
     objective: "Les agents apprennent a boucler un circuit top-down rapide avec chicanes, freinages et checkpoints.",
     hint: "IA: toute la population roule en fantome. Humain: fleches ou WASD pour gaz, brake et direction.",
     sequential: false,
-    defaultPopulation: 24,
+    defaultPopulation: 10,
     defaultMutation: 0.12,
     defaultSpeed: 4,
     maxSpeed: 16,

@@ -346,8 +346,11 @@ test("static app includes every primary control and asset reference", async () =
   assert.match(script, /const MONZA_BITMAP_POINTS = \[/);
   assert.match(script, /const MONZA_CENTERLINE = MONZA_BITMAP_POINTS\.map/);
   assert.match(script, /const MONZA_SAMPLE_STEPS = 8/);
+  assert.match(script, /const MONZA_CORNER_SMOOTHING = 0\.18/);
   assert.match(script, /function buildSmoothFormulaTrack/);
+  assert.match(script, /function smoothedFormulaCorner/);
   assert.doesNotMatch(script, /function catmullRom/);
+  assert.match(script, /const entry = smoothedFormulaCorner\(previous, point, next, MONZA_CORNER_SMOOTHING\)/);
   assert.match(script, /const t = step \/ MONZA_SAMPLE_STEPS/);
   assert.match(script, /name: "Rettifilo"/);
   assert.match(script, /name: "Variante del Rettifilo"/);
@@ -680,9 +683,9 @@ test("game picker switches to Formula Circuit with full-population cars and netw
   assert.equal(element(harness, "lunarSettings").hidden, true);
   assert.equal(element(harness, "presetPanel").hidden, true);
   assert.equal(element(harness, "aliveLabel").textContent, "Alive");
-  assert.equal(element(harness, "alive").textContent, 24);
+  assert.equal(element(harness, "alive").textContent, 10);
   assert.equal(element(harness, "speedLabel").textContent, "Race speed");
-  assert.equal(element(harness, "population").value, 24);
+  assert.equal(element(harness, "population").value, 10);
   assert.equal(element(harness, "mutation").value, "0.12");
   assert.equal(element(harness, "distanceLabel").textContent, "Checkpoints");
   assert.equal(element(harness, "leaderFitnessLabel").textContent, "Lead car");
