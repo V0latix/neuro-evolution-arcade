@@ -2495,10 +2495,10 @@ function createHillClimbGame() {
 function createFormulaCircuitGame() {
   const FORMULA_WORLD_WIDTH = 3600;
   const FORMULA_WORLD_HEIGHT = 2450;
-  const TRACK_WIDTH = 92;
+  const TRACK_WIDTH = 64;
   const HALF_TRACK = TRACK_WIDTH / 2;
-  const CAR_LENGTH = 30;
-  const CAR_WIDTH = 16;
+  const CAR_LENGTH = 22;
+  const CAR_WIDTH = 11;
   const MAX_SPEED = 9.8;
   const ACCELERATION = 0.2;
   const BRAKE_FORCE = 0.2;
@@ -2568,24 +2568,17 @@ function createFormulaCircuitGame() {
   }));
   const TRACK = buildSmoothFormulaTrack(MONZA_CENTERLINE);
 
-  function catmullRom(p0, p1, p2, p3, t) {
-    const t2 = t * t;
-    const t3 = t2 * t;
-    return {
-      x: 0.5 * ((2 * p1.x) + (-p0.x + p2.x) * t + (2 * p0.x - 5 * p1.x + 4 * p2.x - p3.x) * t2 + (-p0.x + 3 * p1.x - 3 * p2.x + p3.x) * t3),
-      y: 0.5 * ((2 * p1.y) + (-p0.y + p2.y) * t + (2 * p0.y - 5 * p1.y + 4 * p2.y - p3.y) * t2 + (-p0.y + 3 * p1.y - 3 * p2.y + p3.y) * t3),
-    };
-  }
-
   function buildSmoothFormulaTrack(points) {
     const smoothed = [];
     for (let index = 0; index < points.length; index += 1) {
-      const p0 = points[(index - 1 + points.length) % points.length];
       const p1 = points[index];
       const p2 = points[(index + 1) % points.length];
-      const p3 = points[(index + 2) % points.length];
       for (let step = 0; step < MONZA_SAMPLE_STEPS; step += 1) {
-        const point = catmullRom(p0, p1, p2, p3, step / MONZA_SAMPLE_STEPS);
+        const t = step / MONZA_SAMPLE_STEPS;
+        const point = {
+          x: p1.x + (p2.x - p1.x) * t,
+          y: p1.y + (p2.y - p1.y) * t,
+        };
         smoothed.push({ ...point, name: p1.name });
       }
     }
