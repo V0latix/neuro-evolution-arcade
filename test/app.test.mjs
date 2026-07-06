@@ -372,6 +372,8 @@ test("static app includes every primary control and asset reference", async () =
   assert.match(script, /gameCanvas\.addEventListener\("click", handleCanvasClick\)/);
   assert.match(script, /function crossedCheckpointLine/);
   assert.match(script, /function createCheckpoint/);
+  assert.match(script, /const SKIPPED_CHECKPOINT_CENTERLINE_INDICES = new Set\(\[5\]\)/);
+  assert.match(script, /const CHECKPOINTS = MONZA_CENTERLINE\s*\.filter\(\(_point, index\) => !SKIPPED_CHECKPOINT_CENTERLINE_INDICES\.has\(index\)\)\s*\.map\(createCheckpoint\)/);
   assert.match(script, /const CHECKPOINT_OVERHANG = 24/);
   assert.match(script, /const CHECKPOINT_TANGENT_SAMPLE = 34/);
   assert.match(script, /function checkpointGeometry/);

@@ -2632,7 +2632,10 @@ function createFormulaCircuitGame() {
     runningLength += segment.length;
   }
   const TRACK_LENGTH = runningLength;
-  const CHECKPOINTS = MONZA_CENTERLINE.map(createCheckpoint);
+  const SKIPPED_CHECKPOINT_CENTERLINE_INDICES = new Set([5]);
+  const CHECKPOINTS = MONZA_CENTERLINE
+    .filter((_point, index) => !SKIPPED_CHECKPOINT_CENTERLINE_INDICES.has(index))
+    .map(createCheckpoint);
 
   function normalizeAngle(angle) {
     let next = angle;
