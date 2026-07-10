@@ -378,7 +378,7 @@ test("static app includes every primary control and asset reference", async () =
   assert.doesNotMatch(script, /cameraY \* 0\.28/);
   assert.match(script, /const startY = -\(cameraY % 56\) - 56/);
   assert.match(script, /const POST_LAP_TARGET_SPLIT = 150/);
-  assert.match(script, /const CHECKPOINT_PROGRESS_FITNESS = 7\.5/);
+  assert.match(script, /const CHECKPOINT_PROGRESS_FITNESS = 16/);
   assert.match(script, /function checkpointSpeedBonus/);
   assert.match(script, /function forwardDistanceBetween/);
   assert.match(script, /function checkpointSegmentProgress/);
