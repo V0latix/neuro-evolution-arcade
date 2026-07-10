@@ -86,11 +86,12 @@ at the same time, but cars are ghosts and do not collide with each other. The
 network observes forward speed, side slip, heading error, spin, off-track state,
 the next checkpoint in car-local coordinates, nearby curve direction, and four
 track sensors. Its four outputs are combinable gas, brake, left, and right
-commands. The Monza layout uses control points derived from a simulator
-bitmap of the circuit, covering the main straight, Rettifilo, Curva Grande,
-Roggia, Lesmo, Serraglio, Ascari, and Alboreto/Parabolica sequence. The
-track-to-car ratio keeps the chicanes meaningful so cars must drive through
-them instead of cutting straight across. Before a first completed lap, positive
+commands. The Monza layout is a hand-authored arcade approximation covering the
+main straight, Rettifilo, Curva Grande, Roggia, Lesmo, Serraglio, Ascari, and
+Alboreto/Parabolica sequence. The three chicanes are
+narrower than fast sections, so cars must drive through the alternating turns
+instead of cutting straight across. Ordered checkpoints cover every named
+section, including all three chicanes. Before a first completed lap, positive
 fitness mostly comes from crossing checkpoint lines in order. After a car has
 completed a lap, fast checkpoint splits and short lap times are weighted much
 more heavily. Local centerline loops do not accumulate fitness, and leaving the

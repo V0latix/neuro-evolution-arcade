@@ -1,3 +1,5 @@
+import { createFormulaTrack } from "./formula-track.js";
+
 const gameCanvas = document.querySelector("#game");
 const ctx = gameCanvas.getContext("2d");
 const networkCanvas = document.querySelector("#network");
@@ -2495,8 +2497,6 @@ function createHillClimbGame() {
 function createFormulaCircuitGame() {
   const FORMULA_WORLD_WIDTH = 3600;
   const FORMULA_WORLD_HEIGHT = 2450;
-  const TRACK_WIDTH = 64;
-  const HALF_TRACK = TRACK_WIDTH / 2;
   const CAR_LENGTH = 22;
   const CAR_WIDTH = 11;
   const MAX_SPEED = 9.8;
@@ -2511,7 +2511,6 @@ function createFormulaCircuitGame() {
   const SENSOR_STEP = 14;
   const START_INDEX = 0;
   const CHECKPOINT_OVERHANG = 24;
-  const CHECKPOINT_TANGENT_SAMPLE = 34;
   const PRE_LAP_CHECKPOINT_BONUS = 3600;
   const POST_LAP_BASE_CHECKPOINT_BONUS = 1800;
   const POST_LAP_TARGET_SPLIT = 150;
@@ -2520,123 +2519,23 @@ function createFormulaCircuitGame() {
   const TARGET_LAP_TIME = 2200;
   const LAP_COMPLETION_BONUS = 12000;
   const LAP_SPEED_MULTIPLIER = 9;
-  const MONZA_SAMPLE_STEPS = 8;
-  const MONZA_CORNER_SMOOTHING = 0.18;
   const CAMERA_LEAD_X = 360;
   const CAMERA_LEAD_Y = 280;
   const MANUAL_CAMERA_FRAMES = 240;
-  const MONZA_BITMAP_ORIGIN_X = 23;
-  const MONZA_BITMAP_ORIGIN_Y = 31;
-  const MONZA_BITMAP_SCALE_X = 3.75;
-  const MONZA_BITMAP_SCALE_Y = 4.85;
-  const MONZA_BITMAP_OFFSET_X = 300;
-  const MONZA_BITMAP_OFFSET_Y = 200;
-  const MONZA_BITMAP_POINTS = [
-    { sx: 705, sy: 427, name: "Rettifilo" },
-    { sx: 600, sy: 427, name: "Rettifilo" },
-    { sx: 480, sy: 427, name: "Rettifilo" },
-    { sx: 340, sy: 427, name: "Rettifilo" },
-    { sx: 303, sy: 427, name: "Variante del Rettifilo" },
-    { sx: 292, sy: 407, name: "Variante del Rettifilo" },
-    { sx: 281, sy: 404, name: "Variante del Rettifilo" },
-    { sx: 270, sy: 425, name: "Variante del Rettifilo" },
-    { sx: 210, sy: 438, name: "Curva Grande" },
-    { sx: 145, sy: 424, name: "Curva Grande" },
-    { sx: 112, sy: 374, name: "Curva Grande" },
-    { sx: 100, sy: 300, name: "Curva Grande" },
-    { sx: 90, sy: 230, name: "Curva Grande" },
-    { sx: 73, sy: 210, name: "Variante della Roggia" },
-    { sx: 56, sy: 145, name: "Variante della Roggia" },
-    { sx: 28, sy: 92, name: "Variante della Roggia" },
-    { sx: 28, sy: 60, name: "Variante della Roggia" },
-    { sx: 52, sy: 47, name: "Lesmo 1" },
-    { sx: 122, sy: 36, name: "Lesmo 1" },
-    { sx: 145, sy: 45, name: "Lesmo 1" },
-    { sx: 190, sy: 125, name: "Lesmo 2" },
-    { sx: 238, sy: 195, name: "Lesmo 2" },
-    { sx: 285, sy: 235, name: "Serraglio" },
-    { sx: 350, sy: 292, name: "Serraglio" },
-    { sx: 402, sy: 320, name: "Variante Ascari" },
-    { sx: 423, sy: 317, name: "Variante Ascari" },
-    { sx: 448, sy: 333, name: "Variante Ascari" },
-    { sx: 520, sy: 334, name: "Variante Ascari" },
-    { sx: 650, sy: 334, name: "Variante Ascari" },
-    { sx: 760, sy: 336, name: "Curva Alboreto" },
-    { sx: 795, sy: 350, name: "Curva Alboreto" },
-    { sx: 775, sy: 390, name: "Curva Alboreto" },
-    { sx: 710, sy: 420, name: "Curva Alboreto" },
-  ];
-  const MONZA_CENTERLINE = MONZA_BITMAP_POINTS.map((point) => ({
-    x: Math.round(MONZA_BITMAP_OFFSET_X + (point.sx - MONZA_BITMAP_ORIGIN_X) * MONZA_BITMAP_SCALE_X),
-    y: Math.round(MONZA_BITMAP_OFFSET_Y + (point.sy - MONZA_BITMAP_ORIGIN_Y) * MONZA_BITMAP_SCALE_Y),
-    name: point.name,
-  }));
-  const TRACK = buildSmoothFormulaTrack(MONZA_CENTERLINE);
-
-  function smoothedFormulaCorner(previous, point, next, amount) {
-    return {
-      entry: {
-        x: point.x + (previous.x - point.x) * amount,
-        y: point.y + (previous.y - point.y) * amount,
-      },
-      exit: {
-        x: point.x + (next.x - point.x) * amount,
-        y: point.y + (next.y - point.y) * amount,
-      },
-    };
-  }
-
-  function buildSmoothFormulaTrack(points) {
-    const rounded = [];
-    for (let index = 0; index < points.length; index += 1) {
-      const previous = points[(index - 1 + points.length) % points.length];
-      const point = points[index];
-      const next = points[(index + 1) % points.length];
-      const entry = smoothedFormulaCorner(previous, point, next, MONZA_CORNER_SMOOTHING);
-      rounded.push({ ...entry.entry, name: point.name });
-      rounded.push({ ...entry.exit, name: point.name });
-    }
-
-    const smoothed = [];
-    for (let index = 0; index < rounded.length; index += 1) {
-      const p1 = rounded[index];
-      const p2 = rounded[(index + 1) % rounded.length];
-      for (let step = 0; step < MONZA_SAMPLE_STEPS; step += 1) {
-        const t = step / MONZA_SAMPLE_STEPS;
-        const point = {
-          x: p1.x + (p2.x - p1.x) * t,
-          y: p1.y + (p2.y - p1.y) * t,
-        };
-        smoothed.push({ ...point, name: p1.name });
-      }
-    }
-    return smoothed;
-  }
-
-  const SEGMENTS = TRACK.map((point, index) => {
-    const next = TRACK[(index + 1) % TRACK.length];
-    const dx = next.x - point.x;
-    const dy = next.y - point.y;
-    const length = Math.hypot(dx, dy);
-    return {
-      from: point,
-      to: next,
-      dx,
-      dy,
-      length,
-      angle: Math.atan2(dy, dx),
-    };
+  const MINI_MAP_CHICANE_LABELS = {
+    "Variante del Rettifilo": "Rett.",
+    "Variante della Roggia": "Roggia",
+    "Variante Ascari": "Ascari",
+  };
+  const FORMULA_TRACK = createFormulaTrack({
+    worldWidth: FORMULA_WORLD_WIDTH,
+    worldHeight: FORMULA_WORLD_HEIGHT,
+    checkpointOverhang: CHECKPOINT_OVERHANG,
   });
-  let runningLength = 0;
-  for (const segment of SEGMENTS) {
-    segment.start = runningLength;
-    runningLength += segment.length;
-  }
-  const TRACK_LENGTH = runningLength;
-  const SKIPPED_CHECKPOINT_CENTERLINE_INDICES = new Set([5]);
-  const CHECKPOINTS = MONZA_CENTERLINE
-    .filter((_point, index) => !SKIPPED_CHECKPOINT_CENTERLINE_INDICES.has(index))
-    .map(createCheckpoint);
+  const TRACK = FORMULA_TRACK.centerline;
+  const SEGMENTS = FORMULA_TRACK.segments;
+  const CHECKPOINTS = FORMULA_TRACK.checkpoints;
+  const TRACK_LENGTH = FORMULA_TRACK.trackLength;
 
   function normalizeAngle(angle) {
     let next = angle;
@@ -2646,59 +2545,7 @@ function createFormulaCircuitGame() {
   }
 
   function closestOnTrack(x, y) {
-    let best = null;
-    for (let index = 0; index < SEGMENTS.length; index += 1) {
-      const segment = SEGMENTS[index];
-      const span = segment.length || 1;
-      const rawT = ((x - segment.from.x) * segment.dx + (y - segment.from.y) * segment.dy) / (span * span);
-      const t = clamp(rawT, 0, 1);
-      const px = segment.from.x + segment.dx * t;
-      const py = segment.from.y + segment.dy * t;
-      const distance = Math.hypot(x - px, y - py);
-      if (!best || distance < best.distance) {
-        best = {
-          x: px,
-          y: py,
-          distance,
-          segmentIndex: index,
-          progress: segment.start + segment.length * t,
-          angle: segment.angle,
-        };
-      }
-    }
-    return best;
-  }
-
-  function checkpointGeometry(x, y, angle, halfWidth) {
-    const lateralX = -Math.sin(angle);
-    const lateralY = Math.cos(angle);
-    return {
-      lateralX,
-      lateralY,
-      lineHalfWidth: halfWidth,
-      startX: x - lateralX * halfWidth,
-      startY: y - lateralY * halfWidth,
-      endX: x + lateralX * halfWidth,
-      endY: y + lateralY * halfWidth,
-    };
-  }
-
-  function createCheckpoint(point, index) {
-    const projected = closestOnTrack(point.x, point.y);
-    const before = pointOnTrack(projected.progress - CHECKPOINT_TANGENT_SAMPLE);
-    const after = pointOnTrack(projected.progress + CHECKPOINT_TANGENT_SAMPLE);
-    const angle = Math.atan2(after.y - before.y, after.x - before.x);
-    const geometry = checkpointGeometry(projected.x, projected.y, angle, HALF_TRACK + CHECKPOINT_OVERHANG);
-    return {
-      x: projected.x,
-      y: projected.y,
-      progress: projected.progress,
-      name: point.name,
-      angle,
-      geometry,
-      lineHalfWidth: geometry.lineHalfWidth,
-      isStart: index === START_INDEX,
-    };
+    return FORMULA_TRACK.getWidthAtClosestSegment(x, y);
   }
 
   function pointOnTrack(progress) {
@@ -2715,7 +2562,8 @@ function createFormulaCircuitGame() {
   }
 
   function isOnTrack(x, y) {
-    return closestOnTrack(x, y).distance <= HALF_TRACK;
+    const closest = closestOnTrack(x, y);
+    return closest.distance <= closest.width / 2;
   }
 
   function sensorValue(agent, offset) {
@@ -2761,8 +2609,8 @@ function createFormulaCircuitGame() {
   }
 
   function crossedCheckpointLine(agent, checkpoint) {
-    const tangentX = Math.cos(checkpoint.angle);
-    const tangentY = Math.sin(checkpoint.angle);
+    const tangentX = Math.cos(checkpoint.geometry.angle);
+    const tangentY = Math.sin(checkpoint.geometry.angle);
     const lateralX = checkpoint.geometry.lateralX;
     const lateralY = checkpoint.geometry.lateralY;
     const previousDx = agent.previousX - checkpoint.x;
@@ -2876,7 +2724,7 @@ function createFormulaCircuitGame() {
       clamp(sideSpeed / MAX_SPEED, -1, 1),
       normalizeAngle(track.angle - agent.angle) / Math.PI,
       clamp(agent.angularVelocity / 0.16, -1, 1),
-      track.distance > HALF_TRACK ? 1 : 0,
+      track.distance > track.width / 2 ? 1 : 0,
       clamp(localX, -1, 1),
       clamp(localY, -1, 1),
       clamp(curve * 2.2, -1, 1),
@@ -2931,14 +2779,14 @@ function createFormulaCircuitGame() {
     agent.vy = forwardY * forwardSpeed + rightY * sideSpeed;
     agent.previousX = agent.x;
     agent.previousY = agent.y;
-    const drag = track.distance <= HALF_TRACK ? DRAG : OFFROAD_DRAG;
+    const drag = track.distance <= track.width / 2 ? DRAG : OFFROAD_DRAG;
     agent.vx *= drag;
     agent.vy *= drag;
     agent.x += agent.vx;
     agent.y += agent.vy;
 
     const nextTrack = closestOnTrack(agent.x, agent.y);
-    const onTrack = nextTrack.distance <= HALF_TRACK;
+    const onTrack = nextTrack.distance <= nextTrack.width / 2;
     if (!onTrack) {
       agent.alive = false;
       agent.fitness -= 900;
@@ -3023,21 +2871,20 @@ function createFormulaCircuitGame() {
   function drawTrack(targetCtx, cameraX, cameraY) {
     targetCtx.lineCap = "round";
     targetCtx.lineJoin = "round";
-    targetCtx.strokeStyle = "#172026";
-    targetCtx.lineWidth = TRACK_WIDTH + 12;
-    targetCtx.beginPath();
-    targetCtx.moveTo(TRACK[0].x - cameraX, TRACK[0].y - cameraY);
-    for (const point of TRACK.slice(1)) targetCtx.lineTo(point.x - cameraX, point.y - cameraY);
-    targetCtx.closePath();
-    targetCtx.stroke();
 
-    targetCtx.strokeStyle = "#3a4246";
-    targetCtx.lineWidth = TRACK_WIDTH;
-    targetCtx.beginPath();
-    targetCtx.moveTo(TRACK[0].x - cameraX, TRACK[0].y - cameraY);
-    for (const point of TRACK.slice(1)) targetCtx.lineTo(point.x - cameraX, point.y - cameraY);
-    targetCtx.closePath();
-    targetCtx.stroke();
+    function strokeTrack(color, widthOffset) {
+      targetCtx.strokeStyle = color;
+      for (const segment of SEGMENTS) {
+        targetCtx.lineWidth = segment.width + widthOffset;
+        targetCtx.beginPath();
+        targetCtx.moveTo(segment.from.x - cameraX, segment.from.y - cameraY);
+        targetCtx.lineTo(segment.to.x - cameraX, segment.to.y - cameraY);
+        targetCtx.stroke();
+      }
+    }
+
+    strokeTrack("#172026", 12);
+    strokeTrack("#3a4246", 0);
 
     targetCtx.strokeStyle = "rgba(255,255,255,0.28)";
     targetCtx.lineWidth = 2;
@@ -3065,7 +2912,7 @@ function createFormulaCircuitGame() {
     targetCtx.rotate(SEGMENTS[START_INDEX].angle + Math.PI / 2);
     targetCtx.fillStyle = "#fff";
     for (let i = -4; i <= 4; i += 1) {
-      targetCtx.fillRect(i * 12, -HALF_TRACK, 6, TRACK_WIDTH);
+      targetCtx.fillRect(i * 12, -TRACK[START_INDEX].width / 2, 6, TRACK[START_INDEX].width);
     }
     targetCtx.restore();
   }
@@ -3148,12 +2995,14 @@ function createFormulaCircuitGame() {
     targetCtx.strokeRect(mapX, mapY, mapWidth, mapHeight);
 
     targetCtx.strokeStyle = "#3a4246";
-    targetCtx.lineWidth = 5;
-    targetCtx.beginPath();
-    targetCtx.moveTo(toMapX(TRACK[0].x), toMapY(TRACK[0].y));
-    for (const point of TRACK.slice(1)) targetCtx.lineTo(toMapX(point.x), toMapY(point.y));
-    targetCtx.closePath();
-    targetCtx.stroke();
+    targetCtx.lineCap = "round";
+    for (const segment of SEGMENTS) {
+      targetCtx.lineWidth = Math.max(3, segment.width * scale);
+      targetCtx.beginPath();
+      targetCtx.moveTo(toMapX(segment.from.x), toMapY(segment.from.y));
+      targetCtx.lineTo(toMapX(segment.to.x), toMapY(segment.to.y));
+      targetCtx.stroke();
+    }
 
     targetCtx.strokeStyle = "rgba(26,86,219,0.76)";
     targetCtx.lineWidth = 1.5;
@@ -3170,6 +3019,40 @@ function createFormulaCircuitGame() {
     targetCtx.fillStyle = "#172026";
     targetCtx.font = "700 11px system-ui";
     targetCtx.fillText("Monza", mapX + 12, mapY + 20);
+
+    const start = TRACK[START_INDEX];
+    const startAngle = SEGMENTS[START_INDEX].angle;
+    const arrowX = toMapX(start.x);
+    const arrowY = toMapY(start.y);
+    const arrowTipX = arrowX + Math.cos(startAngle) * 14;
+    const arrowTipY = arrowY + Math.sin(startAngle) * 14;
+    const arrowBaseX = arrowTipX - Math.cos(startAngle) * 5;
+    const arrowBaseY = arrowTipY - Math.sin(startAngle) * 5;
+    const arrowSideX = -Math.sin(startAngle) * 4;
+    const arrowSideY = Math.cos(startAngle) * 4;
+    targetCtx.strokeStyle = "#1a56db";
+    targetCtx.lineWidth = 1.5;
+    targetCtx.beginPath();
+    targetCtx.moveTo(arrowX, arrowY);
+    targetCtx.lineTo(arrowTipX, arrowTipY);
+    targetCtx.stroke();
+    targetCtx.fillStyle = "#1a56db";
+    targetCtx.beginPath();
+    targetCtx.moveTo(arrowTipX, arrowTipY);
+    targetCtx.lineTo(arrowBaseX + arrowSideX, arrowBaseY + arrowSideY);
+    targetCtx.lineTo(arrowBaseX - arrowSideX, arrowBaseY - arrowSideY);
+    targetCtx.closePath();
+    targetCtx.fill();
+    targetCtx.fillText("START", arrowX - 12, arrowY - 7);
+
+    for (const section of FORMULA_TRACK.sections) {
+      const label = MINI_MAP_CHICANE_LABELS[section.name];
+      if (!label) continue;
+      const marker = section.centerline[Math.floor(section.centerline.length / 2)];
+      targetCtx.fillStyle = "#f2c14e";
+      targetCtx.font = "700 9px system-ui";
+      targetCtx.fillText(label, toMapX(marker.x) + 3, toMapY(marker.y) - 3);
+    }
   }
 
   function handleFormulaCanvasClick(point, targetWorld) {
