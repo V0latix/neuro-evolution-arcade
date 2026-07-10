@@ -19,37 +19,58 @@ export const MONZA_SECTION_ORDER = [
   "Start finish",
 ];
 
-// Original, hand-authored approximation of the Monza GP route in screen-space
-// coordinates. It is deliberately normalized so the same circuit can be used
-// by a scrolling world, a mini-map, and pure geometry tests without an asset.
+// Normalized arcade centreline digitized from the current Monza GP layout and
+// rotated 90 degrees counterclockwise so the start straight runs along the
+// bottom of the simulation. It is an original data representation, not an
+// imported circuit asset. Reference: FIA circuit map and the MIT-licensed
+// bacinger/f1-circuits Monza GeoJSON.
 export const MONZA_NORMALIZED_SECTIONS = [
-  // This hand-authored centreline follows the current GP layout as shown on
-  // the FIA circuit map: the pit straight rises on the west side, Curva Grande
-  // sweeps across the north, the Lesmos sit to the east, and Ascari and
-  // Alboreto close the southern half of the lap.
-  { name: "Rettifilo", points: [[0.10, 0.90], [0.10, 0.82], [0.10, 0.74], [0.10, 0.68]] },
+  { name: "Rettifilo", points: [[0.635, 0.967], [0.437, 0.938], [0.355, 0.925]] },
   {
     name: "Variante del Rettifilo",
-    points: [[0.13, 0.65], [0.27, 0.65], [0.30, 0.61], [0.27, 0.57], [0.29, 0.54]],
+    points: [
+      [0.351, 0.924], [0.349, 0.920], [0.349, 0.915], [0.349, 0.908], [0.349, 0.903], [0.349, 0.897],
+      [0.347, 0.893], [0.345, 0.890], [0.343, 0.890], [0.341, 0.890], [0.295, 0.910],
+    ],
   },
   {
     name: "Curva Grande",
-    points: [[0.295, 0.535], [0.28, 0.49], [0.28, 0.42], [0.30, 0.35], [0.36, 0.29], [0.45, 0.25], [0.55, 0.24]],
+    points: [
+      [0.283, 0.913], [0.272, 0.914], [0.260, 0.913], [0.201, 0.905], [0.191, 0.902], [0.182, 0.899],
+      [0.173, 0.893], [0.162, 0.886], [0.152, 0.877], [0.141, 0.865], [0.131, 0.852], [0.121, 0.835],
+      [0.111, 0.816], [0.102, 0.795], [0.095, 0.773], [0.088, 0.748], [0.083, 0.722], [0.078, 0.694],
+      [0.075, 0.663], [0.073, 0.631], [0.067, 0.505], [0.062, 0.351],
+    ],
   },
   {
     name: "Variante della Roggia",
-    points: [[0.58, 0.24], [0.62, 0.20], [0.68, 0.20], [0.72, 0.24], [0.77, 0.24]],
+    points: [[0.061, 0.342], [0.060, 0.337], [0.057, 0.333], [0.047, 0.328], [0.044, 0.326], [0.042, 0.322], [0.041, 0.316], [0.039, 0.295], [0.036, 0.273]],
   },
-  { name: "Lesmo 1", points: [[0.78, 0.24], [0.83, 0.26], [0.87, 0.31], [0.87, 0.36]] },
-  { name: "Lesmo 2", points: [[0.87, 0.38], [0.86, 0.42], [0.83, 0.46], [0.78, 0.49]] },
-  { name: "Serraglio", points: [[0.75, 0.51], [0.70, 0.55], [0.63, 0.60], [0.56, 0.66], [0.50, 0.70]] },
+  {
+    name: "Lesmo 1",
+    points: [[0.030, 0.240], [0.002, 0.096], [0.000, 0.084], [0.000, 0.072], [0.001, 0.061], [0.003, 0.053], [0.006, 0.045], [0.009, 0.038], [0.015, 0.029], [0.019, 0.023], [0.025, 0.020], [0.031, 0.018], [0.071, 0.012]],
+  },
+  {
+    name: "Lesmo 2",
+    points: [[0.138, 0.000], [0.144, 0.000], [0.148, 0.002], [0.152, 0.005], [0.154, 0.010], [0.157, 0.019], [0.187, 0.113], [0.212, 0.189]],
+  },
+  {
+    name: "Serraglio",
+    points: [[0.227, 0.237], [0.235, 0.260], [0.245, 0.286], [0.254, 0.305], [0.262, 0.321], [0.303, 0.404], [0.334, 0.464], [0.398, 0.589], [0.437, 0.664]],
+  },
   {
     name: "Variante Ascari",
-    points: [[0.47, 0.74], [0.43, 0.79], [0.37, 0.80], [0.33, 0.76], [0.35, 0.71], [0.30, 0.69]],
+    points: [[0.443, 0.675], [0.447, 0.679], [0.450, 0.679], [0.455, 0.679], [0.465, 0.677], [0.471, 0.676], [0.479, 0.676], [0.483, 0.677], [0.489, 0.680], [0.495, 0.685], [0.502, 0.692], [0.508, 0.702], [0.514, 0.713], [0.518, 0.722], [0.521, 0.727], [0.526, 0.731], [0.534, 0.734], [0.570, 0.742]],
   },
-  { name: "Opposite straight", points: [[0.27, 0.70], [0.23, 0.72], [0.18, 0.77], [0.15, 0.83]] },
-  { name: "Curva Alboreto", points: [[0.13, 0.86], [0.12, 0.90], [0.14, 0.94], [0.17, 0.96]] },
-  { name: "Start finish", points: [[0.12, 0.96], [0.10, 0.93]] },
+  { name: "Opposite straight", points: [[0.609, 0.750], [0.958, 0.812]] },
+  {
+    name: "Curva Alboreto",
+    points: [[0.970, 0.815], [0.976, 0.817], [0.982, 0.822], [0.987, 0.829], [0.992, 0.837], [0.996, 0.849], [0.999, 0.861], [1.000, 0.875], [0.999, 0.888], [0.998, 0.899], [0.995, 0.912], [0.992, 0.925], [0.988, 0.934], [0.983, 0.946], [0.975, 0.959], [0.968, 0.967], [0.960, 0.975], [0.951, 0.982], [0.941, 0.988], [0.930, 0.993]],
+  },
+  {
+    name: "Start finish",
+    points: [[0.921, 0.995], [0.908, 0.997], [0.894, 0.998], [0.881, 0.998], [0.856, 0.999], [0.834, 1.000], [0.810, 0.999], [0.778, 0.994], [0.678, 0.977]],
+  },
 ];
 
 function scaledPoint([x, y], section, width, worldWidth, worldHeight, paddingX, paddingY) {
