@@ -345,12 +345,14 @@ test("static app includes every primary control and asset reference", async () =
   assert.match(script, /const FORMULA_WORLD_WIDTH = 3600/);
   assert.match(script, /const FORMULA_WORLD_HEIGHT = 2450/);
   assert.match(script, /const MAX_FORMULA_LAPS = 3/);
-  assert.match(script, /const FORMULA_SPEED_FITNESS = 0\.5/);
+  assert.match(script, /const PROGRESS_SPEED_MULTIPLIER = 0\.25/);
   assert.match(script, /const SENSOR_RANGE = Math\.hypot\(FORMULA_WORLD_WIDTH, FORMULA_WORLD_HEIGHT\)/);
+  assert.match(script, /const SENSOR_INPUT_DISTANCE = 190/);
   assert.match(script, /const FORMULA_SENSOR_OFFSETS = \[/);
   assert.match(script, /function sensorHitDistance/);
+  assert.match(script, /return 1 - Math\.exp\(-sensorHitDistance\(agent, offset\) \/ SENSOR_INPUT_DISTANCE\)/);
   assert.match(script, /const onTrackSpeed = Math\.max\(0, agent\.vx \* Math\.cos\(nextTrack\.angle\) \+ agent\.vy \* Math\.sin\(nextTrack\.angle\)\)/);
-  assert.match(script, /agent\.fitness \+= onTrackSpeed \* FORMULA_SPEED_FITNESS/);
+  assert.doesNotMatch(script, /FORMULA_SPEED_FITNESS/);
   assert.match(script, /if \(agent\.laps >= MAX_FORMULA_LAPS\) \{\s+agent\.alive = false/);
   assert.match(script, /function drawFormulaSensors/);
   assert.match(script, /#2ee7ff/);
@@ -390,7 +392,8 @@ test("static app includes every primary control and asset reference", async () =
   assert.match(script, /agent\.bestCheckpointProgress = 0;\n    agent\.lastProgressFrame = agent\.age;/);
   assert.match(script, /const segmentProgress = checkpointSegmentProgress\(agent, nextTrack\.progress\)/);
   assert.match(script, /const segmentProgressGain = segmentProgress - agent\.bestCheckpointProgress/);
-  assert.match(script, /agent\.fitness \+= segmentProgressGain \* CHECKPOINT_PROGRESS_FITNESS/);
+  assert.match(script, /const speedScaledProgressFitness = segmentProgressGain \* CHECKPOINT_PROGRESS_FITNESS \* \(1 \+ clamp\(onTrackSpeed \/ MAX_SPEED, 0, 1\) \* PROGRESS_SPEED_MULTIPLIER\)/);
+  assert.match(script, /agent\.fitness \+= speedScaledProgressFitness/);
   assert.match(script, /const lapSpeedBonus = Math\.max\(0, TARGET_LAP_TIME - agent\.lastLapTime\) \* LAP_SPEED_MULTIPLIER/);
   assert.match(script, /bestScoreMetric\(nextAgents\)/);
   assert.match(script, /lowerBestScoreIsBetter: true/);

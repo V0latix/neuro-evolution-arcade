@@ -86,7 +86,8 @@ straight, and Curva Alboreto back onto the main straight. Every specimen drives
 at the same time, but cars are ghosts and do not collide with each other. The
 network observes only forward speed and seven track-vision rays spanning the
 180 degrees in front of the car. The visible rays reach the first track edge at
-any distance across the circuit.
+any distance across the circuit, while their neural values use a near-distance
+scale so nearby edges remain distinguishable.
 Its four outputs are combinable gas, brake, left, and right commands. The Monza
 layout is a hand-authored arcade approximation covering the
 main straight, Rettifilo, Curva Grande, Roggia, Lesmo, Serraglio, Ascari, and
@@ -96,8 +97,9 @@ instead of cutting straight across. Ordered checkpoints cover every named
 section, including all three chicanes. Before a first completed lap, positive
 fitness mostly comes from crossing checkpoint lines in order. After a car has
 completed a lap, fast checkpoint splits and short lap times are weighted much
-more heavily. Forward speed along the local track direction also contributes to
-fitness, but speed while reversing or leaving the track does not. A specimen is
+more heavily. Forward speed along the local track direction can only increase
+the reward for validated progress; it never earns a standalone time-based
+bonus. Speed while reversing or leaving the track does not count. A specimen is
 evaluated for at most three completed laps. Local centerline loops do not
 accumulate fitness, and leaving the track, reversing, or failing to progress
 ends the attempt. Once a car completes a lap, Formula Circuit's best score is

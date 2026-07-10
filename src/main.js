@@ -2504,8 +2504,9 @@ function createFormulaCircuitGame() {
   const GRIP = 0.16;
   const MAX_AGE = 6200;
   const MAX_FORMULA_LAPS = 3;
-  const FORMULA_SPEED_FITNESS = 0.5;
+  const PROGRESS_SPEED_MULTIPLIER = 0.25;
   const SENSOR_RANGE = Math.hypot(FORMULA_WORLD_WIDTH, FORMULA_WORLD_HEIGHT);
+  const SENSOR_INPUT_DISTANCE = 190;
   const SENSOR_STEP = 14;
   const FORMULA_SENSOR_OFFSETS = [
     -Math.PI / 2,
@@ -2584,7 +2585,7 @@ function createFormulaCircuitGame() {
   }
 
   function sensorValue(agent, offset) {
-    return sensorHitDistance(agent, offset) / SENSOR_RANGE;
+    return 1 - Math.exp(-sensorHitDistance(agent, offset) / SENSOR_INPUT_DISTANCE);
   }
 
   function trackDelta(current, previous) {
@@ -2791,7 +2792,6 @@ function createFormulaCircuitGame() {
     const onTrackSpeed = Math.max(0, agent.vx * Math.cos(nextTrack.angle) + agent.vy * Math.sin(nextTrack.angle));
     if (progressDelta > 0.05) {
       agent.forwardProgress += Math.min(progressDelta, 18);
-      agent.fitness += onTrackSpeed * FORMULA_SPEED_FITNESS;
     } else if (progressDelta < -2) {
       agent.fitness += progressDelta * 3.8;
     }
@@ -2800,7 +2800,8 @@ function createFormulaCircuitGame() {
     if (segmentProgress > agent.bestCheckpointProgress) {
       const segmentProgressGain = segmentProgress - agent.bestCheckpointProgress;
       agent.bestCheckpointProgress = segmentProgress;
-      agent.fitness += segmentProgressGain * CHECKPOINT_PROGRESS_FITNESS;
+      const speedScaledProgressFitness = segmentProgressGain * CHECKPOINT_PROGRESS_FITNESS * (1 + clamp(onTrackSpeed / MAX_SPEED, 0, 1) * PROGRESS_SPEED_MULTIPLIER);
+      agent.fitness += speedScaledProgressFitness;
       agent.lastProgressFrame = agent.age;
     }
 
