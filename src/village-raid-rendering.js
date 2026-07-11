@@ -25,7 +25,7 @@ const BUILDING_PALETTES = Object.freeze({
 export function drawRaidBuilding(ctx, building, offsetX, tile) {
   if (building.hp <= 0) return;
 
-  const x = offsetX + building.x * tile - 2;
+  const x = offsetX + building.x * tile;
   const y = building.y * tile;
   const width = building.width * tile;
   const height = building.height * tile;
@@ -200,7 +200,7 @@ function drawTroopCue(ctx, type, x, y, radius, tile) {
   if (type === "barbarian") {
     ctx.beginPath();
     ctx.moveTo(x + radius * 0.4, y - radius * 0.2);
-    ctx.lineTo(x + tile * 0.55, y - tile * 0.55);
+    ctx.lineTo(x + tile * 0.5, y - tile * 0.5);
     ctx.stroke();
   } else if (type === "archer") {
     ctx.beginPath();

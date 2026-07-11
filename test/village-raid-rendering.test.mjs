@@ -24,14 +24,14 @@ test("every building type draws inside its complete footprint", () => {
     }, 10, 8);
     const outline = ctx.calls.find((call) =>
       call.type === "strokeRect" &&
-      call.x === 42 &&
+      call.x === 44 &&
       call.y === 42 &&
       call.width === definition.width * 8 - 4 &&
       call.height === definition.height * 8 - 4
     );
     assert.deepEqual(outline, {
       type: "strokeRect",
-      x: 42,
+      x: 44,
       y: 42,
       width: definition.width * 8 - 4,
       height: definition.height * 8 - 4,
@@ -42,8 +42,38 @@ test("every building type draws inside its complete footprint", () => {
 test("the cannon keeps a square base while drawing a round barrel assembly", () => {
   const ctx = recordingContext();
   drawRaidBuilding(ctx, cannonFixture(), 0, 10);
-  assert.ok(ctx.calls.some((call) => call.type === "strokeRect" && call.width === call.height));
-  assert.ok(ctx.calls.some((call) => call.type === "arc"));
+  const outlines = ctx.calls.filter((call) => call.type === "strokeRect");
+  assert.deepEqual(outlines[0], {
+    type: "strokeRect", x: 32, y: 42, width: 26, height: 26,
+  });
+  assert.ok(outlines.some((call) =>
+    call !== outlines[0] && call.width === call.height && call.width < outlines[0].width
+  ));
+  assert.ok(ctx.calls.some((call) => call.type === "arc" && call.x === 45 && call.y === 55));
+});
+
+test("principal building details stay within their natural footprint", () => {
+  for (const [type, definition] of Object.entries(BUILDING_DEFINITIONS)) {
+    const ctx = recordingContext();
+    const building = {
+      id: `${type}-bounds`,
+      type,
+      category: definition.category,
+      x: 4,
+      y: 5,
+      width: definition.width,
+      height: definition.height,
+      hp: definition.hp,
+      maxHp: definition.hp,
+    };
+    drawRaidBuilding(ctx, building, 10, 8);
+    assertGeometryWithin(ctx.calls, {
+      left: 42,
+      top: 40,
+      right: 42 + definition.width * 8,
+      bottom: 40 + definition.height * 8,
+    }, type);
+  }
 });
 
 test("troops have five distinct visual identities and a compact key", () => {
@@ -61,6 +91,11 @@ test("troops have five distinct visual identities and a compact key", () => {
       type,
     );
   }
+  const barbarianCtx = recordingContext();
+  drawRaidTroop(barbarianCtx, troopFixture("barbarian"), 0, 10);
+  assert.ok(barbarianCtx.calls.some((call) =>
+    call.type === "lineTo" && call.x === 65 && call.y === 65
+  ));
   const keyCtx = recordingContext();
   drawRaidTroopKey(keyCtx, 730, 18);
   assert.deepEqual(
@@ -68,6 +103,26 @@ test("troops have five distinct visual identities and a compact key", () => {
     ["B", "A", "G", "Go", "S"],
   );
 });
+
+function assertGeometryWithin(calls, bounds, label) {
+  const transformIndex = calls.findIndex((call) => call.type === "translate");
+  const worldCalls = transformIndex < 0 ? calls : calls.slice(0, transformIndex);
+  for (const call of worldCalls) {
+    if (call.type === "fillRect" || call.type === "strokeRect") {
+      assert.ok(call.x >= bounds.left && call.x + call.width <= bounds.right, `${label} rect x`);
+      assert.ok(call.y >= bounds.top && call.y + call.height <= bounds.bottom, `${label} rect y`);
+    } else if (call.type === "moveTo" || call.type === "lineTo") {
+      assert.ok(call.x >= bounds.left && call.x <= bounds.right, `${label} path x`);
+      assert.ok(call.y >= bounds.top && call.y <= bounds.bottom, `${label} path y`);
+    } else if (call.type === "arc") {
+      assert.ok(call.x - call.radius >= bounds.left && call.x + call.radius <= bounds.right, `${label} arc x`);
+      assert.ok(call.y - call.radius >= bounds.top && call.y + call.radius <= bounds.bottom, `${label} arc y`);
+    } else if (call.type === "ellipse") {
+      assert.ok(call.x - call.radiusX >= bounds.left && call.x + call.radiusX <= bounds.right, `${label} ellipse x`);
+      assert.ok(call.y - call.radiusY >= bounds.top && call.y + call.radiusY <= bounds.bottom, `${label} ellipse y`);
+    }
+  }
+}
 
 function cannonFixture() {
   const definition = BUILDING_DEFINITIONS.cannon;
