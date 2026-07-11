@@ -31,7 +31,7 @@ function run(world, ticks, action) {
 }
 
 test("creates an isolated world and a normalized 37-value observation", () => {
-  const first = createRaidWorld("open", MIXED);
+  const first = createRaidWorld("farm-111", MIXED);
   const second = createRaidWorld(0, MIXED);
   assert.deepEqual(second.metrics, { pathSearches: 0 });
   first.buildings[0].hp = 1;
@@ -45,7 +45,7 @@ test("creates an isolated world and a normalized 37-value observation", () => {
 });
 
 test("A* chooses the deterministic minimum-cost route around an expensive wall", () => {
-  const world = stripWorld(createRaidWorld("open", MIXED));
+  const world = stripWorld(createRaidWorld("farm-111", MIXED));
   const target = world.buildings[0];
   world.buildings.splice(1);
   Object.assign(target, { x: 4, y: 2, width: 1, height: 1 });
@@ -72,7 +72,7 @@ test("chooses the highest-scoring available troop with stable fallback", () => {
 });
 
 test("deployment stays on the perimeter and permits at most one troop per 10 ticks", () => {
-  const world = createRaidWorld("open", BARBARIANS);
+  const world = createRaidWorld("farm-111", BARBARIANS);
   const troop = deployTroop(world, "barbarian", 0.37);
   assert.ok(troop);
   assert.ok(troop.x === 0 || troop.x === 47 || troop.y === 0 || troop.y === 31);
@@ -84,7 +84,7 @@ test("deployment stays on the perimeter and permits at most one troop per 10 tic
 });
 
 test("overlapping allied troops separate gently without leaving the grid", () => {
-  const world = stripWorld(createRaidWorld("open", BARBARIANS));
+  const world = stripWorld(createRaidWorld("farm-111", BARBARIANS));
   world.tick = 0;
   const first = deployTroop(world, "barbarian", 0);
   world.tick = 10;
@@ -102,7 +102,7 @@ test("overlapping allied troops separate gently without leaving the grid", () =>
 });
 
 test("crowd separation caps each total nudge and never enters a live obstacle cell", () => {
-  const world = stripWorld(createRaidWorld("open", MIXED));
+  const world = stripWorld(createRaidWorld("farm-111", MIXED));
   const target = world.buildings[0];
   world.buildings.splice(1);
   Object.assign(target, { x: 11, y: 11, width: 1, height: 2 });
@@ -138,7 +138,7 @@ test("troops select their documented targets deterministically", () => {
   ];
   for (const [type, expected] of cases) {
     const composition = { ...MIXED, [type]: Math.max(1, MIXED[type]) };
-    const world = stripWorld(createRaidWorld("open", composition));
+    const world = stripWorld(createRaidWorld("farm-111", composition));
     const wanted = world.buildings.find((building) => building.id === expected);
     wanted.x = 2;
     wanted.y = 2;
@@ -155,7 +155,7 @@ test("troops select their documented targets deterministically", () => {
 });
 
 test("melee pathfinding does not cross a wall and wall breakers destroy blocking walls", () => {
-  const world = stripWorld(createRaidWorld("open", { ...MIXED, wallBreaker: 1 }), {
+  const world = stripWorld(createRaidWorld("farm-111", { ...MIXED, wallBreaker: 1 }), {
     walls: true,
   });
   world.buildings.splice(1);
@@ -181,7 +181,7 @@ test("melee pathfinding does not cross a wall and wall breakers destroy blocking
 });
 
 test("wall breakers choose the protective wall on the best target route, not the nearest decoration", () => {
-  const world = stripWorld(createRaidWorld("open", { ...MIXED, wallBreaker: 1 }));
+  const world = stripWorld(createRaidWorld("farm-111", { ...MIXED, wallBreaker: 1 }));
   const target = world.buildings[0];
   world.buildings.splice(1);
   Object.assign(target, { x: 8, y: 0, width: 2, height: 2 });
@@ -213,7 +213,7 @@ test("wall breakers choose the protective wall on the best target route, not the
 });
 
 test("wall breakers skip an open nearby building to seek a protected target", () => {
-  const world = stripWorld(createRaidWorld("open", { ...MIXED, wallBreaker: 1 }));
+  const world = stripWorld(createRaidWorld("farm-111", { ...MIXED, wallBreaker: 1 }));
   const [openTarget, protectedTarget] = world.buildings;
   world.buildings.splice(2);
   Object.assign(openTarget, { x: 2, y: 3, width: 1, height: 1 });
@@ -237,7 +237,7 @@ test("wall breakers skip an open nearby building to seek a protected target", ()
 
 test("wall breakers reuse a living wall target instead of repeating protective-path searches", () => {
   const composition = { barbarian: 0, archer: 0, giant: 0, goblin: 0, wallBreaker: 5 };
-  const world = stripWorld(createRaidWorld("open", composition));
+  const world = stripWorld(createRaidWorld("farm-111", composition));
   const target = world.buildings[0];
   world.buildings.splice(1);
   Object.assign(target, { x: 20, y: 0, width: 2, height: 2 });
@@ -264,7 +264,7 @@ test("wall breakers reuse a living wall target instead of repeating protective-p
 
 test("a wall breaker recalculates only after its cached wall is destroyed", () => {
   const composition = { barbarian: 0, archer: 0, giant: 0, goblin: 0, wallBreaker: 1 };
-  const world = stripWorld(createRaidWorld("open", composition));
+  const world = stripWorld(createRaidWorld("farm-111", composition));
   world.buildings.splice(1);
   Object.assign(world.buildings[0], { x: 15, y: 0, width: 2, height: 2 });
   for (const x of [5, 10]) {
@@ -287,7 +287,7 @@ test("a wall breaker recalculates only after its cached wall is destroyed", () =
 
 test("wall breakers cache the absence of a protected target until navigation changes", () => {
   const composition = { barbarian: 0, archer: 0, giant: 0, goblin: 0, wallBreaker: 1 };
-  const world = stripWorld(createRaidWorld("open", composition));
+  const world = stripWorld(createRaidWorld("farm-111", composition));
   world.buildings.splice(1);
   Object.assign(world.buildings[0], { x: 8, y: 0, width: 2, height: 2 });
   world.walls.push({ id: "decorative", type: "wall", x: 1, y: 5, hp: 700, maxHp: 700 });
@@ -300,7 +300,7 @@ test("wall breakers cache the absence of a protected target until navigation cha
 
 test("an unchanged empty movement path is cached instead of searched every tick", () => {
   const composition = { barbarian: 0, archer: 0, giant: 1, goblin: 0, wallBreaker: 0 };
-  const world = stripWorld(createRaidWorld("open", composition));
+  const world = stripWorld(createRaidWorld("farm-111", composition));
   const target = world.buildings.find(({ type }) => type === "cannon");
   const blockers = world.buildings.filter(({ category }) => category !== "defense").slice(0, 2);
   world.buildings.splice(0, world.buildings.length, target, ...blockers);
@@ -315,7 +315,7 @@ test("an unchanged empty movement path is cached instead of searched every tick"
 });
 
 test("a positive movement path is recalculated when another destroyed wall opens a shorter route", () => {
-  const world = stripWorld(createRaidWorld("open", BARBARIANS));
+  const world = stripWorld(createRaidWorld("farm-111", BARBARIANS));
   world.buildings.splice(1);
   Object.assign(world.buildings[0], { x: 5, y: 0, width: 1, height: 1 });
   world.walls.push({ id: "shortcut-wall", type: "wall", x: 2, y: 0, hp: 700, maxHp: 700 });
@@ -333,7 +333,7 @@ test("a positive movement path is recalculated when another destroyed wall opens
 });
 
 test("a living cached protective wall is reevaluated after an unrelated navigation revision", () => {
-  const world = stripWorld(createRaidWorld("open", { ...MIXED, wallBreaker: 1 }));
+  const world = stripWorld(createRaidWorld("farm-111", { ...MIXED, wallBreaker: 1 }));
   world.buildings.splice(1);
   Object.assign(world.buildings[0], { x: 8, y: 0, width: 2, height: 2 });
   world.walls.push({ id: "unrelated-wall", type: "wall", x: 1, y: 4, hp: 700, maxHp: 700 });
@@ -354,7 +354,7 @@ test("a living cached protective wall is reevaluated after an unrelated navigati
 });
 
 test("archers attack across walls without walking through them", () => {
-  const world = stripWorld(createRaidWorld("open", MIXED), { walls: true });
+  const world = stripWorld(createRaidWorld("farm-111", MIXED), { walls: true });
   world.buildings.splice(1);
   const target = world.buildings[0];
   Object.assign(target, { x: 3, y: 1, width: 2, height: 2 });
@@ -370,7 +370,7 @@ test("archers attack across walls without walking through them", () => {
 });
 
 test("single-target defenses respect range and cadence", () => {
-  const world = stripWorld(createRaidWorld("open", BARBARIANS));
+  const world = stripWorld(createRaidWorld("farm-111", BARBARIANS));
   const cannon = world.buildings.find((building) => building.type === "cannon");
   world.buildings.splice(0, world.buildings.length, cannon);
   Object.assign(cannon, { x: 4, y: 1, width: 2, height: 2 });
@@ -382,7 +382,7 @@ test("single-target defenses respect range and cadence", () => {
 });
 
 test("mortar honors minimum range and applies splash on projectile impact", () => {
-  const world = stripWorld(createRaidWorld("open", BARBARIANS));
+  const world = stripWorld(createRaidWorld("farm-111", BARBARIANS));
   const mortar = world.buildings.find((building) => building.type === "mortar");
   world.buildings.splice(0, world.buildings.length, mortar);
   Object.assign(mortar, { x: 8, y: 0, width: 2, height: 2, attackInterval: 0.2 });
@@ -406,7 +406,7 @@ test("mortar honors minimum range and applies splash on projectile impact", () =
 
 test("projectiles travel from the defense to a fixed impact point instead of homing", () => {
   const composition = { barbarian: 0, archer: 0, giant: 2, goblin: 0, wallBreaker: 0 };
-  const world = stripWorld(createRaidWorld("open", composition));
+  const world = stripWorld(createRaidWorld("farm-111", composition));
   const mortar = world.buildings.find((building) => building.type === "mortar");
   world.buildings.splice(0, world.buildings.length, mortar);
   Object.assign(mortar, { x: 8, y: 0, width: 2, height: 2, nextAttackTick: 0 });
@@ -441,7 +441,7 @@ test("projectiles travel from the defense to a fixed impact point instead of hom
 });
 
 test("bombs trigger once and deal splash damage", () => {
-  const world = stripWorld(createRaidWorld("open", BARBARIANS), { traps: true });
+  const world = stripWorld(createRaidWorld("farm-111", BARBARIANS), { traps: true });
   world.buildings.splice(1);
   world.traps.splice(1);
   Object.assign(world.traps[0], { x: 0, y: 0, active: true });
@@ -456,36 +456,37 @@ test("bombs trigger once and deal splash damage", () => {
   assert.equal(first.hp, hp);
 });
 
-test("destruction counts only the 25 buildings at four percent each", () => {
-  const world = createRaidWorld("open", MIXED);
+test("destruction uses the 22-building reference denominator", () => {
+  const world = createRaidWorld("farm-111", MIXED);
+  assert.equal(world.initialBuildingCount, 22);
   world.buildings[0].hp = 0;
   world.walls[0].hp = 0;
   world.traps[0].active = false;
-  assert.equal(destructionPercent(world), 4);
+  assert.equal(destructionPercent(world), 100 / 22);
   for (const building of world.buildings) building.hp = 0;
   assert.equal(destructionPercent(world), 100);
 });
 
-test("destruction keeps the original 25-building denominator when the entity array is filtered", () => {
-  const world = createRaidWorld("open", MIXED);
+test("destruction keeps the captured denominator when the live array is filtered", () => {
+  const world = createRaidWorld("farm-111", MIXED);
   world.buildings[0].hp = 0;
   world.buildings.splice(1);
-  assert.equal(world.totalBuildings, 25);
-  assert.equal(destructionPercent(world), 4);
+  assert.equal(world.initialBuildingCount, 22);
+  assert.equal(destructionPercent(world), 100 / 22);
 });
 
 test("raid completion covers destruction, tick limit, and exhausted forces", () => {
-  const destroyed = createRaidWorld("open", MIXED);
+  const destroyed = createRaidWorld("farm-111", MIXED);
   for (const building of destroyed.buildings) building.hp = 0;
   assert.equal(isRaidComplete(destroyed), true);
   assert.equal(destroyed.endReason, "destroyed");
 
-  const timeout = createRaidWorld("open", MIXED);
+  const timeout = createRaidWorld("farm-111", MIXED);
   timeout.tick = 3600;
   assert.equal(isRaidComplete(timeout), true);
   assert.equal(timeout.endReason, "timeout");
 
-  const exhausted = createRaidWorld("open", { barbarian: 0, archer: 0, giant: 0, goblin: 0, wallBreaker: 0 });
+  const exhausted = createRaidWorld("farm-111", { barbarian: 0, archer: 0, giant: 0, goblin: 0, wallBreaker: 0 });
   assert.equal(isRaidComplete(exhausted), true);
   assert.equal(exhausted.endReason, "exhausted");
 });
@@ -493,22 +494,22 @@ test("raid completion covers destruction, tick limit, and exhausted forces", () 
 test("raid completion reports stalled only when no deployed or inventory force can act", () => {
   const wallBreakerOnly = { barbarian: 0, archer: 0, giant: 0, goblin: 0, wallBreaker: 1 };
 
-  const livingButBlocked = createRaidWorld("open", wallBreakerOnly);
+  const livingButBlocked = createRaidWorld("farm-111", wallBreakerOnly);
   deployTroop(livingButBlocked, "wallBreaker", 0);
   livingButBlocked.walls.length = 0;
   assert.equal(isRaidComplete(livingButBlocked), true);
   assert.equal(livingButBlocked.endReason, "stalled");
 
-  const inventoryButBlocked = createRaidWorld("open", wallBreakerOnly);
+  const inventoryButBlocked = createRaidWorld("farm-111", wallBreakerOnly);
   inventoryButBlocked.walls.length = 0;
   assert.equal(isRaidComplete(inventoryButBlocked), true);
   assert.equal(inventoryButBlocked.endReason, "stalled");
 
-  const ordinaryInventory = createRaidWorld("open", BARBARIANS);
+  const ordinaryInventory = createRaidWorld("farm-111", BARBARIANS);
   ordinaryInventory.walls.length = 0;
   assert.equal(isRaidComplete(ordinaryInventory), false);
 
-  const protectedTarget = createRaidWorld("open", wallBreakerOnly);
+  const protectedTarget = createRaidWorld("farm-111", wallBreakerOnly);
   protectedTarget.walls.length = 0;
   for (let y = 0; y < 32; y += 1) {
     protectedTarget.walls.push({
@@ -526,7 +527,7 @@ test("the same actions replay to exactly the same world state", () => {
     [20, { type: "giant", normalizedPosition: 0.3 }],
   ]);
   function replay() {
-    const world = createRaidWorld("central", MIXED);
+    const world = createRaidWorld("defence-104", MIXED);
     run(world, 160, (tick) => actions.get(tick));
     return JSON.stringify(world);
   }

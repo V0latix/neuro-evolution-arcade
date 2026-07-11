@@ -63,7 +63,7 @@ export function createRaidWorld(layoutId = 0, composition = {}) {
     lastDecisionTick: -RAID_DECISION_TICKS,
     composition: { ...inventory },
     inventory,
-    totalBuildings: buildings.length,
+    initialBuildingCount: buildings.length,
     buildings,
     walls,
     traps,
@@ -168,7 +168,7 @@ export function stepRaid(world, action = null) {
 
 export function destructionPercent(world) {
   const destroyed = world.buildings.filter((building) => building.hp <= 0).length;
-  return (destroyed / world.totalBuildings) * 100;
+  return (destroyed / world.initialBuildingCount) * 100;
 }
 
 export function isRaidComplete(world) {

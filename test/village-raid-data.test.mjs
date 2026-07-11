@@ -2,6 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 
 import {
+  LAYOUT_SOURCES,
   ARMY_CAPACITY,
   BUILDING_DEFINITIONS,
   BUILDING_ROSTER,
@@ -18,8 +19,23 @@ import {
   validateLayout,
 } from "../src/village-raid-data.js";
 
+const REFERENCE_BUILDING_COUNTS = {
+  townHall: 1,
+  clanCastle: 1,
+  armyCamp: 2,
+  barracks: 1,
+  laboratory: 1,
+  goldMine: 3,
+  elixirCollector: 3,
+  goldStorage: 2,
+  elixirStorage: 2,
+  builderHut: 2,
+  cannon: 2,
+  archerTower: 1,
+  mortar: 1,
+};
+
 test("the dated TH3 snapshot exposes the complete maxed roster", () => {
-  assert.equal(SNAPSHOT_VERSION, "th3-2026-07-11-v1");
   assert.equal(ARMY_CAPACITY, 70);
   assert.deepEqual(
     Object.fromEntries(Object.entries(TROOPS).map(([id, troop]) => [id, troop.level])),
@@ -51,7 +67,7 @@ test("the dated TH3 snapshot exposes the complete maxed roster", () => {
     elixirCollector: [3, 6],
     goldStorage: [2, 6],
     elixirStorage: [2, 6],
-    builderHut: [5, 1],
+    builderHut: [2, 1],
     cannon: [2, 4],
     archerTower: [1, 3],
     mortar: [1, 1],
@@ -65,8 +81,8 @@ test("the dated TH3 snapshot exposes the complete maxed roster", () => {
     ),
     expectedBuildings,
   );
-  assert.equal(BUILDING_ROSTER.length, 25);
-  assert.equal(new Set(BUILDING_ROSTER.map((building) => building.id)).size, 25);
+  assert.equal(BUILDING_ROSTER.length, 22);
+  assert.equal(new Set(BUILDING_ROSTER.map((building) => building.id)).size, 22);
   for (const building of BUILDING_ROSTER) {
     assert.ok(building.hp > 0, `${building.id} needs hit points`);
     assert.match(building.category, /^(core|army|resource|defense)$/);
@@ -131,10 +147,16 @@ test("the dated TH3 snapshot exposes the complete maxed roster", () => {
   );
 });
 
-test("layout geometry has a distinct stable compatibility version", () => {
-  assert.equal(RAID_LAYOUT_VERSION, "th3-layouts-v1");
-  assert.notEqual(RAID_LAYOUT_VERSION, SNAPSHOT_VERSION);
-  assert.ok(RAID_LAYOUT_VERSION.length > 0);
+test("the dated TH3 snapshot matches the 22 buildings visible in every reference", () => {
+  assert.equal(SNAPSHOT_VERSION, "th3-2026-07-11-v2");
+  assert.equal(BUILDING_ROSTER.length, 22);
+  assert.deepEqual(
+    Object.fromEntries(
+      Object.entries(BUILDING_DEFINITIONS).map(([type, definition]) => [type, definition.count]),
+    ),
+    REFERENCE_BUILDING_COUNTS,
+  );
+  assert.equal(BUILDING_DEFINITIONS.builderHut.count, 2);
 });
 
 test("army composition always spends exactly 70 housing deterministically", () => {
@@ -177,34 +199,62 @@ test("normalized deployment positions cover only the common grid perimeter", () 
   assert.throws(() => mapPerimeterPosition(1.01), /between 0 and 1/i);
 });
 
-test("all three fixed layouts use the exact roster without overlaps", () => {
-  assert.deepEqual(
-    LAYOUTS.map((layout) => layout.id),
-    ["open", "compartment", "central"],
-  );
+test("the three reference layouts preserve their source identity and exact inventory", () => {
+  assert.equal(RAID_LAYOUT_VERSION, "th3-reference-layouts-v2");
+  assert.deepEqual(LAYOUTS.map(({ id }) => id), ["farm-111", "war-26", "defence-104"]);
+  assert.deepEqual(LAYOUT_SOURCES, {
+    "farm-111": "https://clashofclans-layouts.com/fr/plans/th_3/farm_111.html",
+    "war-26": "https://clashofclans-layouts.com/fr/plans/th_3/war_26.html",
+    "defence-104": "https://clashofclans-layouts.com/fr/plans/th_3/defence_104.html",
+  });
+
   for (const layout of LAYOUTS) {
-    assert.deepEqual(validateLayout(layout), { valid: true, errors: [] });
-    assert.equal(layout.buildings.length, 25);
+    assert.equal(layout.buildings.length, 22, layout.id);
     assert.equal(layout.walls.length, 50);
     assert.equal(layout.traps.length, 2);
+    assert.equal(validateLayout(layout).valid, true, layout.id);
     assert.deepEqual(
-      layout.buildings.map(({ id }) => id).sort(),
-      BUILDING_ROSTER.map(({ id }) => id).sort(),
+      Object.fromEntries(
+        Object.keys(REFERENCE_BUILDING_COUNTS).map((type) => [
+          type,
+          layout.buildings.filter((building) => building.type === type).length,
+        ]),
+      ),
+      REFERENCE_BUILDING_COUNTS,
+      layout.id,
     );
   }
 });
 
-test("the central layout places the complete Town Hall footprint at grid center", () => {
-  const central = LAYOUTS.find(({ id }) => id === "central");
-  const townHall = central.buildings.find(({ id }) => id === "townHall-1");
-  const townHallCenter = {
-    x: townHall.x + (townHall.width - 1) / 2,
-    y: townHall.y + (townHall.height - 1) / 2,
-  };
-  const gridCenter = { x: (GRID.width - 1) / 2, y: (GRID.height - 1) / 2 };
-  assert.ok(Math.abs(townHallCenter.x - gridCenter.x) <= 1);
-  assert.ok(Math.abs(townHallCenter.y - gridCenter.y) <= 1);
-  assert.deepEqual(validateLayout(central), { valid: true, errors: [] });
+test("reference anchors preserve the screenshots' enclosure relationships", () => {
+  for (const layout of LAYOUTS) {
+    const townHall = layout.buildings.find(({ id }) => id === "townHall-1");
+    const wallXs = layout.walls.map(({ x }) => x);
+    const wallYs = layout.walls.map(({ y }) => y);
+    assert.ok(townHall.x > Math.min(...wallXs), `${layout.id} Town Hall left wall`);
+    assert.ok(
+      townHall.x + townHall.width - 1 < Math.max(...wallXs),
+      `${layout.id} Town Hall right wall`,
+    );
+    assert.ok(townHall.y > Math.min(...wallYs), `${layout.id} Town Hall top wall`);
+    assert.ok(
+      townHall.y + townHall.height - 1 < Math.max(...wallYs),
+      `${layout.id} Town Hall bottom wall`,
+    );
+  }
+
+  const war = LAYOUTS.find(({ id }) => id === "war-26");
+  const warTopWall = Math.min(...war.walls.map(({ y }) => y));
+  for (const hut of war.buildings.filter(({ type }) => type === "builderHut")) {
+    assert.ok(hut.y + hut.height - 1 < warTopWall, `${hut.id} must stay above the enclosure`);
+  }
+
+  const defence = LAYOUTS.find(({ id }) => id === "defence-104");
+  const [leftHut, rightHut] = defence.buildings
+    .filter(({ type }) => type === "builderHut")
+    .sort((left, right) => left.x - right.x);
+  assert.ok(leftHut.x + leftHut.width - 1 < Math.min(...defence.walls.map(({ x }) => x)));
+  assert.ok(rightHut.x > Math.max(...defence.walls.map(({ x }) => x)));
 });
 
 test("building footprints and combat metadata are propagated into autonomous layouts", () => {
