@@ -24,6 +24,11 @@ import {
   stepRaid,
 } from "./village-raid-simulation.js";
 import {
+  drawRaidBuilding,
+  drawRaidTroop,
+  drawRaidTroopKey,
+} from "./village-raid-rendering.js";
+import {
   createRaidBasePlan,
   meanRaidDestruction,
 } from "./village-raid-training.js";
@@ -3503,7 +3508,9 @@ function drawRaidWorld(targetCtx, targetWorld, agent) {
     targetCtx.arc(offsetX + (trap.x + 0.5) * tile, (trap.y + 0.5) * tile, tile * 0.28, 0, Math.PI * 2);
     targetCtx.fill();
   }
-  for (const building of raidWorld.buildings) drawRaidBuilding(targetCtx, building, offsetX, tile);
+  for (const building of raidWorld.buildings) {
+    drawRaidBuilding(targetCtx, building, offsetX, tile);
+  }
   for (const projectile of raidWorld.projectiles) {
     targetCtx.fillStyle = "#f2c14e";
     targetCtx.beginPath();
@@ -3511,18 +3518,9 @@ function drawRaidWorld(targetCtx, targetWorld, agent) {
     targetCtx.fill();
   }
   for (const troop of raidWorld.troops) {
-    if (!troop.alive) continue;
-    targetCtx.fillStyle = {
-      barbarian: "#f2c14e", archer: "#e887b7", giant: "#c88d5a", goblin: "#4fae63", wallBreaker: "#edf2f4",
-    }[troop.type];
-    targetCtx.beginPath();
-    targetCtx.arc(offsetX + troop.x * tile, troop.y * tile, troop.type === "giant" ? 6 : 4, 0, Math.PI * 2);
-    targetCtx.fill();
-    targetCtx.fillStyle = "#172026";
-    targetCtx.fillRect(offsetX + troop.x * tile - 6, troop.y * tile - 9, 12, 2);
-    targetCtx.fillStyle = "#5bd36b";
-    targetCtx.fillRect(offsetX + troop.x * tile - 6, troop.y * tile - 9, 12 * (troop.hp / troop.maxHp), 2);
+    if (troop.alive) drawRaidTroop(targetCtx, troop, offsetX, tile);
   }
+  drawRaidTroopKey(targetCtx, WIDTH - 220, 18);
 
   const current = destructionPercent(raidWorld);
   const completed = agent?.raidResults || [];
@@ -3535,21 +3533,6 @@ function drawRaidWorld(targetCtx, targetWorld, agent) {
   targetCtx.font = "700 14px system-ui";
   targetCtx.fillText(`Destruction ${current.toFixed(2)}%`, 32, 65);
   targetCtx.fillText(`Moyenne ${average.toFixed(2)}%`, 32, 87);
-}
-
-function drawRaidBuilding(targetCtx, building, offsetX, tile) {
-  if (building.hp <= 0) return;
-  const colors = { defense: "#d94c3d", resource: "#e3b341", army: "#7b72c6", core: "#477aa8" };
-  const x = offsetX + building.x * tile;
-  const y = building.y * tile;
-  const width = building.width * tile;
-  const height = building.height * tile;
-  targetCtx.fillStyle = colors[building.category] || "#477aa8";
-  targetCtx.fillRect(x + 2, y + 2, width - 4, height - 4);
-  targetCtx.fillStyle = "rgba(23,32,38,0.28)";
-  targetCtx.fillRect(x + 3, y + 4, width - 6, 4);
-  targetCtx.fillStyle = "#5bd36b";
-  targetCtx.fillRect(x + 3, y + 4, (width - 6) * (building.hp / building.maxHp), 4);
 }
 
 

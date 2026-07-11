@@ -131,9 +131,12 @@ function createMockContext() {
     fill() {},
     stroke() {},
     fillRect() {},
-    strokeRect() {},
+    strokeRect(x, y, width, height) {
+      calls.push({ type: "strokeRect", x, y, width, height });
+    },
     moveTo() {},
     lineTo() {},
+    quadraticCurveTo() {},
     closePath() {},
     save() {},
     restore() {},
@@ -383,8 +386,12 @@ test("static app includes every primary control and asset reference", async () =
   assert.match(script, /createVillageRaidGame/);
   assert.match(script, /from "\.\/village-raid-data\.js"/);
   assert.match(script, /from "\.\/village-raid-simulation\.js"/);
+  assert.match(script, /from "\.\/village-raid-rendering\.js"/);
+  assert.match(script, /drawRaidBuilding\(targetCtx, building, offsetX, tile\)/);
+  assert.match(script, /drawRaidTroop\(targetCtx, troop, offsetX, tile\)/);
+  assert.match(script, /drawRaidTroopKey\(targetCtx,/);
+  assert.doesNotMatch(script, /barbarian: "#f2c14e", archer: "#e887b7"/);
   assert.match(script, /wall\.hp \/ wall\.maxHp/);
-  assert.match(script, /troop\.hp \/ troop\.maxHp/);
   assert.match(script, /outputLabels: \["thrust", "left", "right"\]/);
   assert.match(script, /outputLabels: \["gas", "brake"\]/);
   assert.match(script, /outputLabels: \["gas", "brake", "left", "right"\]/);
@@ -647,6 +654,13 @@ test("game picker switches to AI-only Village Raid with its profile and HUD", as
     Math.abs(raidOverlayLabels[0].y - raidOverlayLabels[1].y) >= 18,
     "raid destruction and average labels need separate readable lines",
   );
+
+  const troopKeyLabels = element(harness, "game").getContext().calls
+    .filter((call) => call.type === "fillText")
+    .map((call) => call.text);
+  for (const label of ["B", "A", "G", "Go", "S"]) {
+    assert.equal(troopKeyLabels.includes(label), true, `missing troop key label ${label}`);
+  }
 
   const labels = element(harness, "network").getContext().calls
     .filter((call) => call.type === "fillText")
