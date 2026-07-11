@@ -8,6 +8,25 @@ import {
   recordFirstTripleLapGenome,
   resetFormulaTrainingSession,
 } from "./formula-training.js";
+import {
+  GRID as RAID_GRID,
+  LAYOUTS as RAID_LAYOUTS,
+  RAID_LAYOUT_VERSION,
+  SNAPSHOT_VERSION,
+  TROOPS as RAID_TROOPS,
+  composeArmy,
+} from "./village-raid-data.js";
+import {
+  chooseAvailableTroop,
+  createRaidWorld,
+  destructionPercent,
+  getRaidObservation,
+  stepRaid,
+} from "./village-raid-simulation.js";
+import {
+  createRaidBasePlan,
+  meanRaidDestruction,
+} from "./village-raid-training.js";
 
 const gameCanvas = document.querySelector("#game");
 const ctx = gameCanvas.getContext("2d");
@@ -34,6 +53,7 @@ const ui = {
   gameLunar: document.querySelector("#gameLunar"),
   gameHill: document.querySelector("#gameHill"),
   gameFormula: document.querySelector("#gameFormula"),
+  gameRaid: document.querySelector("#gameRaid"),
   activeGameTitle: document.querySelector("#activeGameTitle"),
   gameObjective: document.querySelector("#gameObjective"),
   gameHint: document.querySelector("#gameHint"),
@@ -65,6 +85,12 @@ const ui = {
   explanationLunar: document.querySelector("#explanationLunar"),
   explanationHill: document.querySelector("#explanationHill"),
   explanationFormula: document.querySelector("#explanationFormula"),
+  explanationRaid: document.querySelector("#explanationRaid"),
+  raidPanel: document.querySelector("#raidPanel"),
+  raidBase: document.querySelector("#raidBase"),
+  raidComposition: document.querySelector("#raidComposition"),
+  raidInventory: document.querySelector("#raidInventory"),
+  raidAverage: document.querySelector("#raidAverage"),
 };
 
 const WIDTH = 960;
@@ -82,6 +108,7 @@ const PIPE_LEGACY_CHAMPION_STORAGE_KEY = "ai-flappy-evolution.champion";
 const LUNAR_CHAMPION_STORAGE_KEY = "neuro-evolution-arcade.lunar.champion";
 const HILL_CHAMPION_STORAGE_KEY = "neuro-evolution-arcade.hill-climb.champion";
 const FORMULA_CHAMPION_STORAGE_KEY = "neuro-evolution-arcade.formula-circuit.champion";
+const RAID_CHAMPION_STORAGE_KEY = "neuro-evolution-arcade.village-raid-th3.champion";
 const PRESETS = {
   easy: { speed: 2, mutation: 0.08, pipeGap: 190, pipeSpacing: 305 },
   normal: { speed: 3, mutation: 0.1, pipeGap: 150, pipeSpacing: 245 },
@@ -117,6 +144,20 @@ const FORMULA_INPUT_LABELS = [
   "vision 60",
   "vision 90",
 ];
+const RAID_INPUT_LABELS = [
+  "phase", "time", "destruction",
+  "inventory barb", "inventory archer", "inventory giant", "inventory goblin", "inventory breaker",
+  "alive barb", "alive archer", "alive giant", "alive goblin", "alive breaker",
+  ...Array.from({ length: 8 }, (_, sector) => [
+    `sector ${sector + 1} hp`, `sector ${sector + 1} threat`, `sector ${sector + 1} walls`,
+  ]).flat(),
+];
+const RAID_INPUT_DISPLAY_LABELS = [
+  ...RAID_INPUT_LABELS.slice(0, 13),
+  ...Array.from({ length: 8 }, (_, sector) => [
+    `sector ${sector + 1}: hp/threat/walls`, "", "",
+  ]).flat(),
+];
 
 let formulaTrainingSession = createFormulaTrainingSession();
 
@@ -125,6 +166,7 @@ const games = {
   lunar: createLunarGame(),
   hill: createHillClimbGame(),
   formula: createFormulaCircuitGame(),
+  raid: createVillageRaidGame(),
 };
 
 let activeGameKey = "pipe";
@@ -472,7 +514,7 @@ function drawNetwork() {
         netCtx.fillStyle = "#31424a";
         netCtx.font = "11px system-ui";
         netCtx.textAlign = "left";
-        netCtx.fillText(game.inputLabels[index], 8, point.y + 4);
+        netCtx.fillText((game.inputDisplayLabels || game.inputLabels)[index], 8, point.y + 4);
       }
     }
   }
@@ -518,6 +560,28 @@ function updateUi() {
   ui.bestFitness.textContent = playMode === "human" ? "-" : Math.round(bestFitness);
   ui.leaderFitness.textContent = playMode === "human" ? "-" : leader ? Math.round(leader.fitness) : 0;
   ui.distanceMetric.textContent = leader ? game.distanceMetric(leader, world) : 0;
+  if (activeGameKey === "raid") updateRaidPanel(leader, world);
+}
+
+function updateRaidPanel(agent, targetWorld) {
+  const raidWorld = targetWorld?.raidWorld;
+  ui.raidBase.textContent = `${(targetWorld?.raidBaseIndex ?? 0) + 1}/3`;
+  ui.raidComposition.textContent = formatRaidArmy(agent?.composition);
+  ui.raidInventory.textContent = formatRaidArmy(raidWorld?.inventory);
+  const completed = agent?.raidResults || [];
+  const current = raidWorld ? destructionPercent(raidWorld) : 0;
+  const average = completed.length
+    ? (completed.reduce((sum, value) => sum + value, 0) + (agent?.alive ? current : 0)) /
+      (completed.length + (agent?.alive ? 1 : 0))
+    : current;
+  ui.raidAverage.textContent = `${average.toFixed(2)}%`;
+}
+
+function formatRaidArmy(army = {}) {
+  return [
+    ["Barbares", "barbarian"], ["Archeres", "archer"], ["Geants", "giant"],
+    ["Gobelins", "goblin"], ["Sapeurs", "wallBreaker"],
+  ].map(([label, id]) => `${label} ${army[id] ?? 0}`).join(" · ");
 }
 
 function loop() {
@@ -567,9 +631,11 @@ function updateModeButtons() {
   ui.modeHuman.classList.toggle("is-active", playMode === "human");
   ui.nextGen.disabled = playMode === "human";
   ui.saveChampion.disabled = playMode === "human";
+  ui.modeHuman.disabled = Boolean(game.aiOnly);
 }
 
 function setMode(mode) {
+  if (mode === "human" && game.aiOnly) return;
   if (playMode === mode) return;
   playMode = mode;
   running = true;
@@ -603,6 +669,7 @@ function updateGameUi() {
   ui.gameLunar.classList.toggle("is-active", activeGameKey === "lunar");
   ui.gameHill.classList.toggle("is-active", activeGameKey === "hill");
   ui.gameFormula.classList.toggle("is-active", activeGameKey === "formula");
+  ui.gameRaid.classList.toggle("is-active", activeGameKey === "raid");
   ui.activeGameTitle.textContent = game.title;
   ui.gameObjective.textContent = game.objective;
   ui.gameHint.textContent = game.hint;
@@ -620,6 +687,8 @@ function updateGameUi() {
   ui.explanationLunar.classList.toggle("is-hidden", activeGameKey !== "lunar");
   ui.explanationHill.classList.toggle("is-hidden", activeGameKey !== "hill");
   ui.explanationFormula.classList.toggle("is-hidden", activeGameKey !== "formula");
+  ui.explanationRaid.classList.toggle("is-hidden", activeGameKey !== "raid");
+  setSettingsPanel(ui.raidPanel, activeGameKey === "raid");
   ui.preset.disabled = !pipeActive;
   updateLunarSettingOutputs();
 }
@@ -675,6 +744,8 @@ function saveChampion() {
     outputs: game.outputs,
     savedAt: new Date().toISOString(),
   };
+  if (game.datasetVersion) payload.datasetVersion = game.datasetVersion;
+  if (game.layoutVersion) payload.layoutVersion = game.layoutVersion;
   localStorage.setItem(game.championStorageKey, JSON.stringify(payload));
   setChampionStatus(`${game.title} champion saved locally. Fitness ${Math.round(bestFitness)}.`);
 }
@@ -688,7 +759,19 @@ function loadChampion() {
 
   try {
     const payload = JSON.parse(raw);
-    if (!Array.isArray(payload.genome) || payload.genome.length !== genomeLength()) {
+    const incompatibleProfile = game.strictChampionProfile && (
+      payload.game !== activeGameKey ||
+      payload.inputs !== game.inputs ||
+      payload.hidden !== game.hidden ||
+      payload.outputs !== game.outputs
+    );
+    if (
+      !Array.isArray(payload.genome) ||
+      payload.genome.length !== genomeLength() ||
+      incompatibleProfile ||
+      (game.datasetVersion && payload.datasetVersion !== game.datasetVersion) ||
+      (game.layoutVersion && payload.layoutVersion !== game.layoutVersion)
+    ) {
       setChampionStatus("Saved champion is incompatible with this network.");
       return;
     }
@@ -3259,6 +3342,216 @@ function createFormulaCircuitGame() {
   };
 }
 
+function createVillageRaidGame() {
+  const troopIds = Object.keys(RAID_TROOPS);
+
+  function phaseObservation() {
+    return [0, 1, 0, ...Array(troopIds.length * 2).fill(0), ...Array(24).fill(0)];
+  }
+
+  function beginBase(agent, targetWorld, baseIndex) {
+    const plan = createRaidBasePlan(baseIndex, agent.composition);
+    targetWorld.raidBaseIndex = plan.baseIndex;
+    targetWorld.raidWorld = createRaidWorld(plan.baseIndex, plan.composition);
+  }
+
+  function finishBase(agent, targetWorld) {
+    agent.raidResults.push(destructionPercent(targetWorld.raidWorld));
+    if (targetWorld.raidBaseIndex < RAID_LAYOUTS.length - 1) {
+      beginBase(agent, targetWorld, targetWorld.raidBaseIndex + 1);
+      return;
+    }
+    agent.fitness = meanRaidDestruction(agent.raidResults);
+    agent.score = agent.fitness;
+    agent.alive = false;
+  }
+
+  return {
+    key: "raid",
+    title: "Village Raid HDV 3",
+    objective: "Les agents composent une armee puis apprennent ou et quand deployer chaque troupe sur trois villages HDV 3.",
+    hint: "IA uniquement : un specimen attaque successivement les trois bases fixes.",
+    sequential: true,
+    aiOnly: true,
+    defaultPopulation: 24,
+    defaultMutation: 0.12,
+    defaultSpeed: 30,
+    maxSpeed: 100,
+    speedLabel: "Attack speed",
+    populationLabel: "Specimens",
+    leaderFitnessLabel: "Destruction average",
+    inputs: 37,
+    hidden: 18,
+    outputs: 7,
+    inputLabels: RAID_INPUT_LABELS,
+    inputDisplayLabels: RAID_INPUT_DISPLAY_LABELS,
+    outputLabels: ["barbarian", "archer", "giant", "goblin", "wall breaker", "perimeter", "deploy"],
+    outputLabel: "Raid",
+    distanceLabel: "Destruction",
+    championStorageKey: RAID_CHAMPION_STORAGE_KEY,
+    championStorageKeys: [RAID_CHAMPION_STORAGE_KEY],
+    datasetVersion: SNAPSHOT_VERSION,
+    layoutVersion: RAID_LAYOUT_VERSION,
+    strictChampionProfile: true,
+    defaultChampionStatus: "No Village Raid HDV 3 champion saved yet.",
+    humanNetworkMessage: "Village Raid is trained by AI specimens only.",
+    createWorld() {
+      return { activeAgentIndex: 0, raidBaseIndex: 0, raidWorld: null };
+    },
+    makeAgent(id, genome) {
+      return { id, genome, alive: false, fitness: 0, score: 0, composition: null, raidResults: [] };
+    },
+    resetAgents(nextAgents, targetWorld) {
+      targetWorld.activeAgentIndex = 0;
+      targetWorld.raidBaseIndex = 0;
+      targetWorld.raidWorld = null;
+      for (const agent of nextAgents) {
+        agent.alive = false;
+        agent.fitness = 0;
+        agent.score = 0;
+        agent.composition = null;
+        agent.raidResults = [];
+      }
+    },
+    startAgent(agent, targetWorld) {
+      const compositionOutputs = feedForward(agent.genome, phaseObservation(), this);
+      agent.composition = composeArmy(probabilitiesToLogits(compositionOutputs.slice(0, 5)));
+      agent.raidResults = [];
+      agent.fitness = 0;
+      agent.score = 0;
+      agent.alive = true;
+      beginBase(agent, targetWorld, 0);
+    },
+    stepWorld() {},
+    updateAgent(agent, targetWorld) {
+      const raidWorld = targetWorld.raidWorld;
+      const outputs = feedForward(agent.genome, getRaidObservation(raidWorld), this);
+      const type = chooseAvailableTroop(outputs.slice(0, 5), raidWorld.inventory);
+      stepRaid(raidWorld, {
+        deploy: outputs[6] > 0.55 && Boolean(type),
+        type,
+        normalizedPosition: outputs[5],
+      });
+      if (raidWorld.complete) finishBase(agent, targetWorld);
+    },
+    sequentialScore(_nextAgents, targetWorld) {
+      return targetWorld.raidWorld ? destructionPercent(targetWorld.raidWorld) : 0;
+    },
+    bestScoreMetric(nextAgents) {
+      return Math.max(0, ...nextAgents.filter((agent) => !agent.alive).map((agent) => agent.score));
+    },
+    formatScore(value) {
+      return `${Number(value).toFixed(2)}%`;
+    },
+    formatBestScore(value) {
+      return `${Number(value).toFixed(2)}%`;
+    },
+    distanceMetric(_agent, targetWorld) {
+      return targetWorld.raidWorld ? `${destructionPercent(targetWorld.raidWorld).toFixed(2)}%` : "0.00%";
+    },
+    draw(targetCtx, targetWorld, visibleAgents) {
+      drawRaidWorld(targetCtx, targetWorld, visibleAgents[0]);
+    },
+  };
+}
+
+function probabilitiesToLogits(probabilities) {
+  return probabilities.map((probability) => {
+    const stable = Math.max(1e-6, Math.min(1 - 1e-6, probability));
+    return Math.log(stable / (1 - stable));
+  });
+}
+
+function drawRaidWorld(targetCtx, targetWorld, agent) {
+  const raidWorld = targetWorld?.raidWorld;
+  const tile = Math.min(WIDTH / RAID_GRID.width, HEIGHT / RAID_GRID.height);
+  const offsetX = (WIDTH - RAID_GRID.width * tile) / 2;
+  targetCtx.fillStyle = "#d9edc2";
+  targetCtx.fillRect(0, 0, WIDTH, HEIGHT);
+  targetCtx.fillStyle = "#b9d99a";
+  targetCtx.fillRect(offsetX, 0, RAID_GRID.width * tile, RAID_GRID.height * tile);
+  targetCtx.strokeStyle = "rgba(23,32,38,0.12)";
+  targetCtx.lineWidth = 1;
+  for (let x = 0; x <= RAID_GRID.width; x += 1) {
+    targetCtx.beginPath();
+    targetCtx.moveTo(offsetX + x * tile, 0);
+    targetCtx.lineTo(offsetX + x * tile, HEIGHT);
+    targetCtx.stroke();
+  }
+  for (let y = 0; y <= RAID_GRID.height; y += 1) {
+    targetCtx.beginPath();
+    targetCtx.moveTo(offsetX, y * tile);
+    targetCtx.lineTo(offsetX + RAID_GRID.width * tile, y * tile);
+    targetCtx.stroke();
+  }
+  targetCtx.strokeStyle = "#e56f51";
+  targetCtx.lineWidth = 3;
+  targetCtx.strokeRect(offsetX + 2, 2, RAID_GRID.width * tile - 4, RAID_GRID.height * tile - 4);
+  if (!raidWorld) return;
+
+  for (const wall of raidWorld.walls) {
+    if (wall.hp <= 0) continue;
+    targetCtx.fillStyle = "#6f6459";
+    targetCtx.fillRect(offsetX + wall.x * tile + 1, wall.y * tile + 1, tile - 2, tile - 2);
+    targetCtx.fillStyle = "#5bd36b";
+    targetCtx.fillRect(offsetX + wall.x * tile + 2, wall.y * tile + 2, (tile - 4) * (wall.hp / wall.maxHp), 2);
+  }
+  for (const trap of raidWorld.traps) {
+    if (!trap.active) continue;
+    targetCtx.fillStyle = "#d94c3d";
+    targetCtx.beginPath();
+    targetCtx.arc(offsetX + (trap.x + 0.5) * tile, (trap.y + 0.5) * tile, tile * 0.28, 0, Math.PI * 2);
+    targetCtx.fill();
+  }
+  for (const building of raidWorld.buildings) drawRaidBuilding(targetCtx, building, offsetX, tile);
+  for (const projectile of raidWorld.projectiles) {
+    targetCtx.fillStyle = "#f2c14e";
+    targetCtx.beginPath();
+    targetCtx.arc(offsetX + projectile.x * tile, projectile.y * tile, 3, 0, Math.PI * 2);
+    targetCtx.fill();
+  }
+  for (const troop of raidWorld.troops) {
+    if (!troop.alive) continue;
+    targetCtx.fillStyle = {
+      barbarian: "#f2c14e", archer: "#e887b7", giant: "#c88d5a", goblin: "#4fae63", wallBreaker: "#edf2f4",
+    }[troop.type];
+    targetCtx.beginPath();
+    targetCtx.arc(offsetX + troop.x * tile, troop.y * tile, troop.type === "giant" ? 6 : 4, 0, Math.PI * 2);
+    targetCtx.fill();
+    targetCtx.fillStyle = "#172026";
+    targetCtx.fillRect(offsetX + troop.x * tile - 6, troop.y * tile - 9, 12, 2);
+    targetCtx.fillStyle = "#5bd36b";
+    targetCtx.fillRect(offsetX + troop.x * tile - 6, troop.y * tile - 9, 12 * (troop.hp / troop.maxHp), 2);
+  }
+
+  const current = destructionPercent(raidWorld);
+  const completed = agent?.raidResults || [];
+  const average = (completed.reduce((sum, value) => sum + value, 0) + current) / (completed.length + 1);
+  targetCtx.fillStyle = "rgba(255,255,255,0.9)";
+  targetCtx.fillRect(18, 18, 280, 86);
+  targetCtx.fillStyle = "#172026";
+  targetCtx.font = "800 17px system-ui";
+  targetCtx.fillText(`Base ${targetWorld.raidBaseIndex + 1}/3`, 32, 43);
+  targetCtx.font = "700 14px system-ui";
+  targetCtx.fillText(`Destruction ${current.toFixed(2)}%`, 32, 65);
+  targetCtx.fillText(`Moyenne ${average.toFixed(2)}%`, 32, 87);
+}
+
+function drawRaidBuilding(targetCtx, building, offsetX, tile) {
+  if (building.hp <= 0) return;
+  const colors = { defense: "#d94c3d", resource: "#e3b341", army: "#7b72c6", core: "#477aa8" };
+  const x = offsetX + building.x * tile;
+  const y = building.y * tile;
+  const width = building.width * tile;
+  const height = building.height * tile;
+  targetCtx.fillStyle = colors[building.category] || "#477aa8";
+  targetCtx.fillRect(x + 2, y + 2, width - 4, height - 4);
+  targetCtx.fillStyle = "rgba(23,32,38,0.28)";
+  targetCtx.fillRect(x + 3, y + 4, width - 6, 4);
+  targetCtx.fillStyle = "#5bd36b";
+  targetCtx.fillRect(x + 3, y + 4, (width - 6) * (building.hp / building.maxHp), 4);
+}
+
 
 function drawScoreBadge(targetCtx, currentScore) {
   targetCtx.fillStyle = "rgba(255,255,255,0.82)";
@@ -3310,6 +3603,7 @@ ui.gamePipe.addEventListener("click", () => setGame("pipe"));
 ui.gameLunar.addEventListener("click", () => setGame("lunar"));
 ui.gameHill.addEventListener("click", () => setGame("hill"));
 ui.gameFormula.addEventListener("click", () => setGame("formula"));
+ui.gameRaid.addEventListener("click", () => setGame("raid"));
 ui.speed.addEventListener("input", () => {
   ui.speedValue.textContent = `${ui.speed.value}x`;
   if (activeGameKey === "pipe") ui.preset.value = "custom";

@@ -53,6 +53,9 @@
             <button id="gameFormula" class="game-tab" type="button">
               <strong>Formula Circuit</strong>
             </button>
+            <button id="gameRaid" class="game-tab" type="button">
+              <strong>Village Raid HDV 3</strong>
+            </button>
           </section>
 
           <div class="stage-wrap">
@@ -190,6 +193,31 @@
               l'essai.
             </p>
           </section>
+
+          <section id="explanationRaid" class="panel-section explanation is-hidden">
+            <h2>Comment Village Raid HDV 3 apprend</h2>
+            <p>
+              Chaque specimen utilise un reseau 37 &rarr; 18 &rarr; 7. Il observe la phase, le temps,
+              la destruction, l'inventaire et les troupes vivantes, puis les points de vie, la
+              menace defensive et les murs dans huit secteurs du village.
+            </p>
+            <p>
+              Les cinq premieres sorties composent une armee de exactement 70 places et choisissent
+              ensuite la troupe disponible. Les deux dernieres sorties choisissent une position sur
+              le perimetre et decident de deployer ou d'attendre. Une decision ne pose jamais plus
+              d'une troupe.
+            </p>
+            <p>
+              Les specimens jouent seuls et attaquent les trois bases fixes dans le meme ordre avec
+              la meme composition remise a neuf. Leur fitness est strictement la moyenne des trois
+              pourcentages de destruction : aucun bonus de temps, d'etoile ou de troupe restante.
+            </p>
+            <p>
+              Cette simulation top-down emploie des visuels originaux et un moteur arcade local. Elle
+              reproduit un snapshot HDV 3 date du 11 juillet 2026, sans asset officiel ni appel reseau
+              pendant le jeu.
+            </p>
+          </section>
         </div>
 
         <aside class="panel">
@@ -266,6 +294,13 @@
               <option value="hard">Hard</option>
               <option value="chaos">Chaos</option>
             </select>
+          </div>
+
+          <div id="raidPanel" class="panel-section is-hidden" hidden>
+            <div class="stat-line"><span>Base</span><strong id="raidBase">1/3</strong></div>
+            <div class="raid-detail"><span>Composition</span><strong id="raidComposition">-</strong></div>
+            <div class="raid-detail"><span>Inventaire</span><strong id="raidInventory">-</strong></div>
+            <div class="stat-line"><span>Moyenne provisoire</span><strong id="raidAverage">0.00%</strong></div>
           </div>
 
           <div class="panel-section">

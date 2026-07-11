@@ -3,8 +3,8 @@
 Neuro Evolution Arcade is a browser playground for training small neural
 networks to play arcade-style games through neuroevolution.
 
-The current games are Flappy Bird, Lunar Lander Lite, Hill Climb, and Formula
-Circuit. The long-term direction is to add more games that reuse the same learning loop:
+The current games are Flappy Bird, Lunar Lander Lite, Hill Climb, Formula
+Circuit, and Village Raid HDV 3. The long-term direction is to add more games that reuse the same learning loop:
 observe game state, decide an action, score fitness, select the strongest
 agents, cross over their networks, mutate weights, and run a new generation.
 
@@ -12,7 +12,7 @@ agents, cross over their networks, mutate weights, and run a new generation.
 
 The app currently runs entirely in the browser and includes:
 
-- Canvas-based Flappy Bird, Lunar Lander Lite, Hill Climb, and Formula Circuit
+- Canvas-based Flappy Bird, Lunar Lander Lite, Hill Climb, Formula Circuit, and Village Raid HDV 3
   simulations
 - A game picker that separates game-specific controls and explanations
 - Populations of neural-network-controlled agents
@@ -108,6 +108,82 @@ accumulate fitness, and leaving the track, reversing, or failing to progress
 ends the attempt. Lap times remain telemetry, and Formula Circuit's best score
 is the fastest completed lap time.
 
+`Village Raid HDV 3` is an AI-only top-down village attack simulation. Its local
+combat snapshot is versioned `th3-2026-07-11-v1`, its geometry is versioned
+`th3-layouts-v1`, and both are dated `2026-07-11`. Each specimen
+first composes exactly 70 housing spaces, then deploys one troop at a time around
+the village perimeter. The 37 -> 18 -> 7 network observes phase, time,
+destruction, five inventory ratios, five living-troop ratios, and three channels
+for each of eight spatial sectors. Its outputs score the five troop types, select
+a perimeter position, and open or close the deployment gate.
+
+Every specimen attacks three fixed layouts sequentially: open, compartmented,
+and central Town Hall. The full composition is restored for every base. Fitness
+is the strict mean of the three destruction percentages; time, remaining troops,
+walls, bombs, and stars never add shaping rewards. The snapshot contains 25
+buildings, 50 walls, and 2 bombs. The building roster is: 1 Town Hall, 1 Clan
+Castle, 2 Army Camps, 1 Barracks, 1 Laboratory, 3 Gold Mines, 3 Elixir
+Collectors, 2 Gold Storages, 2 Elixir Storages, 5 Builder Huts, 2 Cannons, 1
+Archer Tower, and 1 Mortar. The Clan Castle is empty; spells, heroes, and
+reinforcements are outside this arcade model.
+
+| Building | Quantity | Level | HP | DPS | Range | Cadence |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| Town Hall | 1 | 3 | 1600 | - | - | - |
+| Clan Castle | 1 | 1 | 1000 | - | - | - |
+| Army Camp | 2 | 3 | 290 | - | - | - |
+| Barracks | 1 | 5 | 420 | - | - | - |
+| Laboratory | 1 | 1 | 500 | - | - | - |
+| Gold Mine | 3 | 6 | 600 | - | - | - |
+| Elixir Collector | 3 | 6 | 600 | - | - | - |
+| Gold Storage | 2 | 6 | 1400 | - | - | - |
+| Elixir Storage | 2 | 6 | 1400 | - | - | - |
+| Builder Hut | 5 | 1 | 250 | - | - | - |
+| Cannon | 2 | 4 | 500 | 17 | 9 | 0.8 s |
+| Archer Tower | 1 | 3 | 460 | 19 | 10 | 0.5 s |
+| Mortar | 1 | 1 | 400 | 4 | 11 | 5 s |
+
+The Mortar deals 20 damage per shot, with minimum range 4 and splash radius 1.5.
+The village also contains 50 walls at level 3 with 400 HP each, and 2 bombs at
+level 2 dealing 24 damage, with trigger radius 1.5 and damage radius 3.
+
+| Troop | Level | DPS | HP | Housing | Specialization |
+| --- | ---: | ---: | ---: | ---: | --- |
+| Barbarian | 2 | 12 | 54 | 1 | Any building |
+| Archer | 2 | 10 | 26 | 1 | Ranged attack |
+| Giant | 1 | 12 | 400 | 5 | Defenses first |
+| Goblin | 2 | 14 | 30 | 1 | Double resource damage |
+| Wall Breaker | 1 | 0 | 20 | 2 | 400 wall damage |
+
+Snapshot sources:
+
+- Progression and buildings: [Town Hall](https://clashofclans.fandom.com/wiki/Town_Hall),
+  [Clan Castle](https://clashofclans.fandom.com/wiki/Clan_Castle),
+  [Army Camp](https://clashofclans.fandom.com/wiki/Army_Camp),
+  [Barracks](https://clashofclans.fandom.com/wiki/Barracks),
+  [Laboratory](https://clashofclans.fandom.com/wiki/Laboratory),
+  [Gold Mine](https://clashofclans.fandom.com/wiki/Gold_Mine),
+  [Elixir Collector](https://clashofclans.fandom.com/wiki/Elixir_Collector),
+  [Gold Storage](https://clashofclans.fandom.com/wiki/Gold_Storage),
+  [Elixir Storage](https://clashofclans.fandom.com/wiki/Elixir_Storage), and
+  [Builder's Hut](https://clashofclans.fandom.com/wiki/Builder%27s_Hut).
+- Defenses and traps: [Cannon](https://clashofclans.fandom.com/wiki/Cannon/Home_Village),
+  [Archer Tower](https://clashofclans.fandom.com/wiki/Archer_Tower/Home_Village),
+  [Mortar](https://clashofclans.fandom.com/wiki/Mortar/Home_Village),
+  [Wall](https://clashofclans.fandom.com/wiki/Wall/Home_Village), and
+  [Bomb](https://clashofclans.fandom.com/wiki/Bomb).
+- Troops: [Barbarian](https://clashofclans.fandom.com/wiki/Barbarian),
+  [Archer](https://clashofclans.fandom.com/wiki/Archer),
+  [Giant](https://clashofclans.fandom.com/wiki/Giant),
+  [Goblin](https://clashofclans.fandom.com/wiki/Goblin), and
+  [Wall Breaker](https://clashofclans.fandom.com/wiki/Wall_Breaker).
+- Roles and early-game strategy: [Clash Ninja new-player guide](https://www.clash.ninja/guides/new-player-guide).
+
+These values are a dated local snapshot, not a live service. The deterministic
+arcade engine simplifies collision, targeting, movement, projectile travel, and
+timing while preserving the documented roles used by the model. It uses original
+geometric visuals, ships all data locally, and makes no runtime network request.
+
 ## Next Game Ideas
 
 Strong candidates for future modules after Lunar:
@@ -166,6 +242,8 @@ environment.
 - `Hill Climb`: use right/up/W/D for gas and left/down/A/S for brake
 - `Formula Circuit`: use up/W for gas, down/S for brake, and left/A or right/D
   for steering
+- `Village Raid HDV 3`: AI training only; inspect the current base, composition,
+  inventory, destruction, and provisional average in the read-only Raid panel
 - `Save` / `Load` / `Clear`: manage the best saved champion in local browser
   storage
 - `Preset difficulte`: apply easy, normal, hard, or chaos training settings
@@ -177,3 +255,5 @@ copyrighted game assets. Hill Climb uses original terrain, physics tuning, and
 shapes rather than copied game assets or level data.
 Formula Circuit uses a hand-drawn geometric approximation of Monza's current
 Grand Prix route rather than official track artwork, logos, or branding.
+Village Raid uses original geometric buildings and troops, not official game
+assets, logos, or copied village artwork.

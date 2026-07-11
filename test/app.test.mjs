@@ -12,6 +12,7 @@ const legacyChampionStorageKey = "ai-flappy-evolution.champion";
 const lunarChampionStorageKey = "neuro-evolution-arcade.lunar.champion";
 const hillChampionStorageKey = "neuro-evolution-arcade.hill-climb.champion";
 const formulaChampionStorageKey = "neuro-evolution-arcade.formula-circuit.champion";
+const raidChampionStorageKey = "neuro-evolution-arcade.village-raid-th3.champion";
 const execFileAsync = promisify(execFile);
 
 class ClassList {
@@ -254,6 +255,14 @@ function element(harness, id) {
   return harness.elements.get(id);
 }
 
+function runUntil(harness, predicate, maxFrames) {
+  for (let frameIndex = 0; frameIndex < maxFrames; frameIndex += 1) {
+    if (predicate()) return frameIndex;
+    harness.runFrame();
+  }
+  assert.fail(`condition not reached within ${maxFrames} frames`);
+}
+
 test("static app includes every primary control and asset reference", async () => {
   const html = await readFile(new URL("../index.html", import.meta.url), "utf8");
   const script = await readFile(new URL("../src/main.js", import.meta.url), "utf8");
@@ -273,6 +282,7 @@ test("static app includes every primary control and asset reference", async () =
     "gameLunar",
     "gameHill",
     "gameFormula",
+    "gameRaid",
     "activeGameTitle",
     "gameObjective",
     "gameHint",
@@ -297,6 +307,12 @@ test("static app includes every primary control and asset reference", async () =
     "preset",
     "explanationHill",
     "explanationFormula",
+    "explanationRaid",
+    "raidPanel",
+    "raidBase",
+    "raidComposition",
+    "raidInventory",
+    "raidAverage",
     "leaderFitnessLabel",
     "saveChampion",
     "loadChampion",
@@ -314,9 +330,34 @@ test("static app includes every primary control and asset reference", async () =
   assert.match(html, /Lunar Lander/);
   assert.match(html, /Hill Climb/);
   assert.match(html, /Formula Circuit/);
+  assert.match(html, /Village Raid HDV 3/);
+  assert.match(html, /37[^\n]*18[^\n]*7/);
+  assert.match(html, /trois bases/);
   assert.match(html, /Les trois chicanes sont volontairement plus etroites/);
   assert.match(readme, /hand-authored arcade approximation/);
   assert.match(readme, /The three chicanes are\s+narrower than fast sections/);
+  assert.match(readme, /Village Raid HDV 3/);
+  assert.match(readme, /2026-07-11/);
+  assert.match(readme, /Barbarian[^\n]*12[^\n]*54[^\n]*1/);
+  assert.match(readme, /25\s+buildings,\s+50 walls,\s+and 2 bombs/i);
+  assert.match(readme, /37[^\n]*18[^\n]*7/);
+  assert.match(readme, /strict mean[^\n]*destruction/i);
+  assert.match(readme, /clashofclans\.fandom\.com/);
+  assert.match(readme, /clash\.ninja/);
+  assert.match(readme, /\| Town Hall \| 1 \| 3 \| 1600 \|/);
+  assert.match(readme, /\| Builder Hut \| 5 \| 1 \| 250 \|/);
+  assert.match(readme, /\| Cannon \| 2 \| 4 \| 500 \| 17 \| 9 \| 0\.8 s \|/);
+  assert.match(readme, /\| Archer Tower \| 1 \| 3 \| 460 \| 19 \| 10 \| 0\.5 s \|/);
+  assert.match(readme, /\| Mortar \| 1 \| 1 \| 400 \| 4 \| 11 \| 5 s \|/);
+  assert.match(readme, /minimum range 4[^\n]*splash radius 1\.5/i);
+  assert.match(readme, /50 walls[\s\S]{0,60}level 3[\s\S]{0,60}400 HP/i);
+  assert.match(readme, /2 bombs[\s\S]{0,60}level 2[\s\S]{0,60}24 damage[\s\S]{0,60}1\.5[\s\S]{0,60}3/i);
+  for (const page of [
+    "Town_Hall", "Cannon/Home_Village", "Archer_Tower/Home_Village", "Mortar/Home_Village",
+    "Wall/Home_Village", "Bomb", "Barbarian", "Archer", "Giant", "Goblin", "Wall_Breaker",
+  ]) {
+    assert.match(readme, new RegExp(`clashofclans\\.fandom\\.com/wiki/${page.replace("/", "\\/")}`));
+  }
   assert.doesNotMatch(html, /Collines, carburant, flips/);
   assert.match(favicon, /<svg/);
   assert.match(favicon, /Neuro Evolution Arcade/);
@@ -339,6 +380,11 @@ test("static app includes every primary control and asset reference", async () =
   assert.match(script, /createLunarGame/);
   assert.match(script, /createHillClimbGame/);
   assert.match(script, /createFormulaCircuitGame/);
+  assert.match(script, /createVillageRaidGame/);
+  assert.match(script, /from "\.\/village-raid-data\.js"/);
+  assert.match(script, /from "\.\/village-raid-simulation\.js"/);
+  assert.match(script, /wall\.hp \/ wall\.maxHp/);
+  assert.match(script, /troop\.hp \/ troop\.maxHp/);
   assert.match(script, /outputLabels: \["thrust", "left", "right"\]/);
   assert.match(script, /outputLabels: \["gas", "brake"\]/);
   assert.match(script, /outputLabels: \["gas", "brake", "left", "right"\]/);
@@ -568,6 +614,187 @@ test("static app includes every primary control and asset reference", async () =
   assert.match(script, /pad dx/);
   assert.match(script, /vision -90/);
   assert.match(script, /vision 90/);
+});
+
+test("game picker switches to AI-only Village Raid with its profile and HUD", async () => {
+  const harness = await loadHarness();
+
+  element(harness, "gameRaid").click();
+  harness.runFrame();
+
+  assert.equal(element(harness, "activeGameTitle").textContent, "Village Raid HDV 3");
+  assert.equal(element(harness, "gameRaid").classList.contains("is-active"), true);
+  assert.equal(element(harness, "aliveLabel").textContent, "Specimen");
+  assert.equal(element(harness, "alive").textContent, "1/24");
+  assert.equal(element(harness, "population").value, 24);
+  assert.equal(element(harness, "mutation").value, "0.12");
+  assert.equal(element(harness, "speed").value, 30);
+  assert.equal(element(harness, "speed").max, 100);
+  assert.equal(element(harness, "raidPanel").hidden, false);
+  assert.equal(element(harness, "pipeSettings").hidden, true);
+  assert.equal(element(harness, "lunarSettings").hidden, true);
+  assert.equal(element(harness, "presetPanel").hidden, true);
+  assert.equal(element(harness, "modeHuman").disabled, true);
+  assert.equal(element(harness, "raidBase").textContent, "1/3");
+  assert.match(element(harness, "raidComposition").textContent, /Barbares/);
+  assert.match(element(harness, "raidInventory").textContent, /Barbares/);
+  assert.equal(element(harness, "raidAverage").textContent, "0.00%");
+
+  const raidOverlayLabels = element(harness, "game").getContext().calls
+    .filter((call) => call.type === "fillText" && /^(Destruction|Moyenne)/.test(call.text));
+  assert.equal(raidOverlayLabels.length, 2);
+  assert.ok(
+    Math.abs(raidOverlayLabels[0].y - raidOverlayLabels[1].y) >= 18,
+    "raid destruction and average labels need separate readable lines",
+  );
+
+  const labels = element(harness, "network").getContext().calls
+    .filter((call) => call.type === "fillText")
+    .map((call) => call.text);
+  assert.equal(labels.includes("phase"), true);
+  assert.equal(labels.includes("sector 1: hp/threat/walls"), true);
+  assert.equal(labels.includes("sector 8: hp/threat/walls"), true);
+  assert.equal(labels.includes("sector 1 threat"), false);
+  for (const output of ["barbarian", "archer", "giant", "goblin", "wall breaker", "perimeter", "deploy"]) {
+    assert.equal(labels.includes(output), true, `missing network output ${output}`);
+  }
+
+  element(harness, "modeHuman").click();
+  harness.runFrame();
+  assert.equal(element(harness, "generation").textContent, 1);
+
+  element(harness, "gamePipe").click();
+  harness.runFrame();
+  assert.equal(element(harness, "modeHuman").disabled, false);
+  assert.equal(element(harness, "raidPanel").hidden, true);
+});
+
+test("Village Raid champions carry and enforce the profile, dataset, and layout versions", async () => {
+  const harness = await loadHarness();
+  element(harness, "gameRaid").click();
+  harness.runFrame();
+
+  element(harness, "saveChampion").click();
+  const saved = JSON.parse(harness.storage.getItem(raidChampionStorageKey));
+  assert.equal(saved.game, "raid");
+  assert.equal(saved.inputs, 37);
+  assert.equal(saved.hidden, 18);
+  assert.equal(saved.outputs, 7);
+  assert.equal(saved.datasetVersion, "th3-2026-07-11-v1");
+  assert.equal(saved.layoutVersion, "th3-layouts-v1");
+  assert.equal(saved.genome.length, 817);
+
+  for (const incompatible of [
+    { ...saved, game: "pipe" },
+    { ...saved, inputs: 36 },
+    { ...saved, hidden: 17 },
+    { ...saved, outputs: 6 },
+    { ...saved, datasetVersion: "obsolete" },
+    { ...saved, layoutVersion: "obsolete" },
+  ]) {
+    harness.storage.setItem(raidChampionStorageKey, JSON.stringify(incompatible));
+    element(harness, "loadChampion").click();
+    assert.match(element(harness, "championStatus").textContent, /incompatible/);
+  }
+});
+
+test("Village Raid converts saturated output probabilities into a specialized army", async () => {
+  const harness = await loadHarness();
+  element(harness, "gameRaid").click();
+  harness.runFrame();
+  const genome = Array.from({ length: 817 }, () => 0);
+  const outputBiasIndices = [702, 721, 740, 759, 778, 797, 816];
+  for (const [output, bias] of [20, -20, -20, -20, -20].entries()) {
+    genome[outputBiasIndices[output]] = bias;
+  }
+  harness.storage.setItem(raidChampionStorageKey, JSON.stringify({
+    game: "raid",
+    genome,
+    inputs: 37,
+    hidden: 18,
+    outputs: 7,
+    datasetVersion: "th3-2026-07-11-v1",
+    layoutVersion: "th3-layouts-v1",
+  }));
+  element(harness, "loadChampion").click();
+  harness.runFrame();
+
+  assert.equal(
+    element(harness, "raidComposition").textContent,
+    "Barbares 70 · Archeres 0 · Geants 0 · Gobelins 0 · Sapeurs 0",
+  );
+  assert.equal(element(harness, "raidInventory").textContent, element(harness, "raidComposition").textContent);
+});
+
+test("Village Raid evaluates the three bases before advancing to the next specimen", async () => {
+  const harness = await loadHarness();
+  element(harness, "gameRaid").click();
+  harness.runFrame();
+  element(harness, "speed").value = 100;
+  harness.storage.setItem(raidChampionStorageKey, JSON.stringify({
+    game: "raid",
+    genome: Array.from({ length: 817 }, () => 0),
+    inputs: 37,
+    hidden: 18,
+    outputs: 7,
+    datasetVersion: "th3-2026-07-11-v1",
+    layoutVersion: "th3-layouts-v1",
+  }));
+  element(harness, "loadChampion").click();
+  harness.runFrame();
+
+  const composition = element(harness, "raidComposition").textContent;
+  const firstInventory = element(harness, "raidInventory").textContent;
+
+  harness.runFrame(35);
+  assert.equal(element(harness, "alive").textContent, "1/24");
+  assert.equal(element(harness, "raidBase").textContent, "2/3");
+  assert.equal(element(harness, "raidComposition").textContent, composition);
+  assert.equal(element(harness, "raidInventory").textContent, firstInventory);
+  harness.runFrame(36);
+  assert.equal(element(harness, "alive").textContent, "1/24");
+  assert.equal(element(harness, "raidBase").textContent, "3/3");
+  assert.equal(element(harness, "raidComposition").textContent, composition);
+  assert.equal(element(harness, "raidInventory").textContent, firstInventory);
+  harness.runFrame(36);
+  assert.equal(element(harness, "alive").textContent, "2/24");
+  assert.equal(element(harness, "raidBase").textContent, "1/3");
+  assert.equal(element(harness, "bestScore").textContent, "0.00%");
+});
+
+test("Village Raid restores a depleted specialized army at each base transition", async () => {
+  const harness = await loadHarness();
+  element(harness, "gameRaid").click();
+  harness.runFrame();
+  element(harness, "speed").value = 1;
+  const genome = Array.from({ length: 817 }, () => 0);
+  const outputBiasIndices = [702, 721, 740, 759, 778, 797, 816];
+  for (const [output, bias] of [10, -10, -10, -10, -10, 0, 10].entries()) {
+    genome[outputBiasIndices[output]] = bias;
+  }
+  harness.storage.setItem(raidChampionStorageKey, JSON.stringify({
+    game: "raid",
+    genome,
+    inputs: 37,
+    hidden: 18,
+    outputs: 7,
+    datasetVersion: "th3-2026-07-11-v1",
+    layoutVersion: "th3-layouts-v1",
+  }));
+  element(harness, "loadChampion").click();
+  harness.runFrame(3);
+
+  const fullArmy = "Barbares 70 · Archeres 0 · Geants 0 · Gobelins 0 · Sapeurs 0";
+  assert.equal(element(harness, "raidComposition").textContent, fullArmy);
+  assert.match(element(harness, "raidInventory").textContent, /^Barbares 69\b/);
+
+  runUntil(harness, () => element(harness, "raidBase").textContent === "2/3", 3601);
+  assert.equal(element(harness, "raidInventory").textContent, fullArmy);
+  harness.runFrame(3);
+  assert.match(element(harness, "raidInventory").textContent, /^Barbares 69\b/);
+
+  runUntil(harness, () => element(harness, "raidBase").textContent === "3/3", 3601);
+  assert.equal(element(harness, "raidInventory").textContent, fullArmy);
 });
 
 test("module boots, draws AI network labels, and reports initial training state", async () => {

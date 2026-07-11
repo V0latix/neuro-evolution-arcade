@@ -202,7 +202,7 @@ label {
 
 .game-picker {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(5, minmax(0, 1fr));
   gap: 10px;
 }
 
@@ -327,6 +327,25 @@ select {
 
 .stat-line:last-child {
   border-bottom: 0;
+}
+
+.raid-detail {
+  display: grid;
+  gap: 4px;
+  padding: 9px 0;
+  border-bottom: 2px solid var(--fg);
+}
+
+.raid-detail span {
+  color: var(--muted);
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.raid-detail strong {
+  font-size: 0.78rem;
+  line-height: 1.45;
 }
 
 .game-summary {
