@@ -27,6 +27,36 @@ test("building names expose all 13 French inspection labels", () => {
   });
 });
 
+test("all 13 building types draw their own recognizable label-free cues", () => {
+  const cueChecks = {
+    townHall: (calls) => countCalls(calls, "closePath") >= 2 && hasFill(calls, "#f5d77a"),
+    clanCastle: (calls) => detailRects(calls, "#aeb8c4").length >= 3,
+    armyCamp: (calls) => countCalls(calls, "closePath") >= 2 && countCalls(calls, "arc") >= 1,
+    barracks: (calls) => countCalls(calls, "closePath") >= 1 && countCalls(calls, "moveTo") >= 3,
+    laboratory: (calls) => calls.some((call) =>
+      call.type === "ellipse" && call.radiusX >= 7 && call.radiusY >= 7
+    ) && detailRects(calls, "#72d6df").length >= 1,
+    goldMine: (calls) => countCalls(calls, "lineTo") >= 2 && detailRects(calls, "#d6a42f").length >= 1,
+    elixirCollector: (calls) => countCalls(calls, "lineTo") >= 2 && countCalls(calls, "ellipse") >= 1,
+    goldStorage: (calls) => detailRects(calls, "#8a6428").length >= 1 && countCalls(calls, "arc") >= 3,
+    elixirStorage: (calls) => countCalls(calls, "ellipse") >= 2 && detailRects(calls, "#67366f").some(isStopper),
+    builderHut: (calls) => countCalls(calls, "closePath") >= 1 && countCalls(calls, "moveTo") >= 2,
+    cannon: (calls) => countCalls(calls, "arc") >= 2 && detailRects(calls).some(isLongRect),
+    archerTower: (calls) => countCalls(calls, "lineTo") >= 4 && countCalls(calls, "arc") >= 1,
+    mortar: (calls) => countCalls(calls, "rotate") === 1 && countCalls(calls, "ellipse") >= 1,
+  };
+  const missing = [];
+
+  for (const [type, check] of Object.entries(cueChecks)) {
+    const ctx = recordingContext();
+    drawRaidBuilding(ctx, buildingFixture(type), 0, 10);
+    if (!check(ctx.calls)) missing.push(type);
+    assert.equal(countCalls(ctx.calls, "fillText"), 0, `${type} permanent label`);
+  }
+
+  assert.deepEqual(missing, []);
+});
+
 test("every building type draws inside its complete footprint", () => {
   for (const [type, definition] of Object.entries(BUILDING_DEFINITIONS)) {
     const ctx = recordingContext();
@@ -87,6 +117,7 @@ test("the mortar draws a round turntable and a rotated open tube", () => {
     (call.type === "arc" || call.type === "ellipse") &&
     (call.radius ?? call.radiusX) < 4
   ), "dark tube opening");
+  assertMortarTransformWithin(ctx.calls, { left: 30, top: 40, right: 60, bottom: 70 });
 });
 
 test("gold mine uses rails and a cart rather than a storage sphere", () => {
@@ -94,7 +125,9 @@ test("gold mine uses rails and a cart rather than a storage sphere", () => {
   drawRaidBuilding(ctx, buildingFixture("goldMine"), 0, 10);
 
   assert.ok(ctx.calls.filter((call) => call.type === "lineTo").length >= 2, "rail lines");
-  assert.ok(ctx.calls.filter((call) => call.type === "fillRect").length >= 2, "cart rectangle");
+  assert.ok(detailRects(ctx.calls, "#d6a42f").some((call) =>
+    call.y >= 55 && call.width >= 8 && call.width <= 12 && call.height >= 4 && call.height <= 7
+  ), "small gold cart below the mine entrance");
   assert.equal(ctx.calls.some((call) =>
     call.type === "ellipse" && call.radiusX >= 7 && call.radiusY >= 7
   ), false, "no large spherical storage ellipse");
@@ -104,8 +137,8 @@ test("gold storage draws a reinforced bin filled with coins", () => {
   const ctx = recordingContext();
   drawRaidBuilding(ctx, buildingFixture("goldStorage"), 0, 10);
 
-  assert.ok(ctx.calls.some((call) =>
-    call.type === "fillRect" && call.width >= 15 && call.height >= 10
+  assert.ok(detailRects(ctx.calls, "#8a6428").some((call) =>
+    call.width >= 18 && call.width <= 22 && call.height >= 15 && call.height <= 18
   ), "large bin");
   assert.ok(ctx.calls.filter((call) => call.type === "arc" && call.radius <= 3).length >= 3, "coins");
 });
@@ -127,7 +160,7 @@ test("elixir storage draws a large spherical tank and stopper", () => {
   assert.ok(ctx.calls.some((call) =>
     call.type === "ellipse" && call.radiusX >= 7 && call.radiusY >= 7
   ), "large spherical tank");
-  assert.ok(ctx.calls.filter((call) => call.type === "fillRect").length >= 2, "stopper rectangle");
+  assert.ok(detailRects(ctx.calls, "#67366f").some(isStopper), "small top stopper rectangle");
 });
 
 test("building health bars sit above the footprint", () => {
@@ -141,6 +174,14 @@ test("building health bars sit above the footprint", () => {
     assert.equal(bars.length, 2, type);
     assert.ok(bars.every((call) => call.y < building.y * 10), type);
   }
+
+  const topEdgeBuilding = { ...buildingFixture("elixirCollector"), y: 0 };
+  const topEdgeCtx = recordingContext();
+  drawRaidBuilding(topEdgeCtx, topEdgeBuilding, 0, 10);
+  const topEdgeBars = topEdgeCtx.calls.filter((call) =>
+    call.type === "fillRect" && ["#20262d", "#48c774"].includes(call.fillStyle)
+  );
+  assert.ok(topEdgeBars.every((call) => call.y < 0), "top-edge health bars");
 });
 
 test("principal building details stay within their natural footprint", () => {
@@ -228,6 +269,65 @@ function assertGeometryWithin(calls, bounds, label) {
       assert.ok(call.y - call.radiusY >= bounds.top && call.y + call.radiusY <= bounds.bottom, `${label} ellipse y`);
     }
   }
+}
+
+function assertMortarTransformWithin(calls, bounds) {
+  const translation = calls.find((call) => call.type === "translate");
+  const rotation = calls.find((call) => call.type === "rotate");
+  const transformedCalls = calls.slice(calls.indexOf(rotation) + 1);
+  const tube = transformedCalls.find((call) => call.type === "fillRect");
+  const opening = transformedCalls.find((call) => call.type === "ellipse");
+  assert.ok(translation && rotation && tube && opening, "complete mortar transform");
+
+  for (const [localX, localY] of [
+    [tube.x, tube.y],
+    [tube.x + tube.width, tube.y],
+    [tube.x + tube.width, tube.y + tube.height],
+    [tube.x, tube.y + tube.height],
+  ]) {
+    const point = transformPoint(localX, localY, translation, rotation.angle);
+    assert.ok(point.x >= bounds.left && point.x <= bounds.right, "mortar tube x");
+    assert.ok(point.y >= bounds.top && point.y <= bounds.bottom, "mortar tube y");
+  }
+
+  const center = transformPoint(opening.x, opening.y, translation, rotation.angle);
+  const angle = rotation.angle + opening.rotation;
+  const radiusX = Math.hypot(opening.radiusX * Math.cos(angle), opening.radiusY * Math.sin(angle));
+  const radiusY = Math.hypot(opening.radiusX * Math.sin(angle), opening.radiusY * Math.cos(angle));
+  assert.ok(center.x - radiusX >= bounds.left && center.x + radiusX <= bounds.right, "mortar opening x");
+  assert.ok(center.y - radiusY >= bounds.top && center.y + radiusY <= bounds.bottom, "mortar opening y");
+}
+
+function transformPoint(x, y, translation, angle) {
+  return {
+    x: translation.x + x * Math.cos(angle) - y * Math.sin(angle),
+    y: translation.y + x * Math.sin(angle) + y * Math.cos(angle),
+  };
+}
+
+function countCalls(calls, type) {
+  return calls.filter((call) => call.type === type).length;
+}
+
+function hasFill(calls, fillStyle) {
+  return calls.some((call) => call.type === "fillStyle" && call.value === fillStyle);
+}
+
+function detailRects(calls, fillStyle) {
+  return calls.filter((call) =>
+    call.type === "fillRect" &&
+    call.width < 26 && call.height < 26 &&
+    !["#20262d", "#48c774"].includes(call.fillStyle) &&
+    (!fillStyle || call.fillStyle === fillStyle)
+  );
+}
+
+function isLongRect(call) {
+  return call.width >= call.height * 2.5;
+}
+
+function isStopper(call) {
+  return call.y < 48 && call.width < 10 && call.height < 5;
 }
 
 function cannonFixture() {

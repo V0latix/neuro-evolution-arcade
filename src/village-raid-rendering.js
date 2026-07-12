@@ -54,7 +54,7 @@ export function drawRaidBuilding(ctx, building, offsetX, tile) {
   ctx.strokeRect(x + 2, y + 2, width - 4, height - 4);
 
   drawBuildingDetail(ctx, building.type, x, y, width, height, primary, secondary);
-  drawHealthBar(ctx, x + 3, Math.max(1, y - 5), width - 6, building.hp, building.maxHp);
+  drawHealthBar(ctx, x + 3, y - 5, width - 6, building.hp, building.maxHp);
   ctx.restore();
 }
 
@@ -105,12 +105,37 @@ function drawBuildingDetail(ctx, type, x, y, width, height, primary, secondary) 
   ctx.fillStyle = primary;
   ctx.strokeStyle = secondary;
 
-  if (type === "townHall" || type === "barracks" || type === "builderHut") {
+  if (type === "townHall") {
+    ctx.fillStyle = secondary;
     drawRoof(ctx, x + inset, y + inset, width - inset * 2, height - inset * 2);
-    if (type === "townHall") {
-      ctx.fillStyle = "#f5d77a";
-      ctx.fillRect(centerX - width * 0.08, centerY, width * 0.16, height * 0.25);
-    }
+    ctx.fillStyle = primary;
+    drawRoof(ctx, x + inset * 1.35, y + inset * 1.15, width - inset * 2.7, height * 0.42);
+    ctx.fillStyle = "#f5d77a";
+    ctx.fillRect(centerX - width * 0.08, centerY, width * 0.16, height * 0.25);
+    return;
+  }
+
+  if (type === "barracks") {
+    drawRoof(ctx, x + inset, y + inset, width - inset * 2, height - inset * 2);
+    ctx.strokeStyle = "#f4d38a";
+    ctx.beginPath();
+    ctx.moveTo(x + width * 0.3, y + height * 0.7);
+    ctx.lineTo(x + width * 0.7, y + height * 0.3);
+    ctx.moveTo(x + width * 0.3, y + height * 0.3);
+    ctx.lineTo(x + width * 0.7, y + height * 0.7);
+    ctx.stroke();
+    return;
+  }
+
+  if (type === "builderHut") {
+    drawRoof(ctx, x + inset, y + inset, width - inset * 2, height - inset * 2);
+    ctx.strokeStyle = "#d7b58a";
+    ctx.beginPath();
+    ctx.moveTo(x + width * 0.35, y + height * 0.7);
+    ctx.lineTo(x + width * 0.68, y + height * 0.34);
+    ctx.stroke();
+    ctx.fillStyle = "#b7c0c9";
+    ctx.fillRect(x + width * 0.56, y + height * 0.24, width * 0.24, height * 0.13);
     return;
   }
 
@@ -123,12 +148,32 @@ function drawBuildingDetail(ctx, type, x, y, width, height, primary, secondary) 
   }
 
   if (type === "armyCamp") {
+    ctx.fillStyle = primary;
     ctx.beginPath();
-    ctx.moveTo(centerX, y + inset);
-    ctx.lineTo(x + width - inset, y + height - inset);
-    ctx.lineTo(x + inset, y + height - inset);
+    ctx.moveTo(x + width * 0.28, y + height * 0.18);
+    ctx.lineTo(x + width * 0.48, y + height * 0.62);
+    ctx.lineTo(x + width * 0.1, y + height * 0.62);
     ctx.closePath();
     ctx.fill();
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(x + width * 0.72, y + height * 0.18);
+    ctx.lineTo(x + width * 0.9, y + height * 0.62);
+    ctx.lineTo(x + width * 0.52, y + height * 0.62);
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+    ctx.fillStyle = "#f2b84b";
+    ctx.beginPath();
+    ctx.arc(centerX, y + height * 0.74, Math.min(width, height) * 0.09, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = "#5b3825";
+    ctx.beginPath();
+    ctx.moveTo(x + width * 0.38, y + height * 0.84);
+    ctx.lineTo(x + width * 0.62, y + height * 0.7);
+    ctx.moveTo(x + width * 0.38, y + height * 0.7);
+    ctx.lineTo(x + width * 0.62, y + height * 0.84);
+    ctx.stroke();
     return;
   }
 
@@ -232,8 +277,18 @@ function drawBuildingDetail(ctx, type, x, y, width, height, primary, secondary) 
     ctx.lineTo(centerX - topWidth * 0.32, y + inset);
     ctx.moveTo(centerX + topWidth / 2, y + height - inset);
     ctx.lineTo(centerX + topWidth * 0.32, y + inset);
+    ctx.moveTo(centerX - topWidth * 0.12, y + height - inset);
+    ctx.lineTo(centerX - topWidth * 0.05, y + inset);
+    ctx.moveTo(centerX + topWidth * 0.12, y + height - inset);
+    ctx.lineTo(centerX + topWidth * 0.05, y + inset);
     ctx.stroke();
     ctx.fillRect(centerX - topWidth / 2, y + inset, topWidth, height * 0.22);
+    ctx.strokeStyle = "#e4c48b";
+    ctx.beginPath();
+    ctx.arc(centerX, y + inset + height * 0.08, topWidth * 0.24, -Math.PI / 2, Math.PI / 2);
+    ctx.moveTo(centerX, y + inset + height * 0.08 - topWidth * 0.24);
+    ctx.lineTo(centerX, y + inset + height * 0.08 + topWidth * 0.24);
+    ctx.stroke();
     return;
   }
 
