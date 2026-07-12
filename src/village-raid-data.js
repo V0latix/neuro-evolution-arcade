@@ -1,6 +1,6 @@
 export const SNAPSHOT_VERSION = "th3-2026-07-11-v2";
 // Snapshot versions combat data; layout versions the three base geometries independently.
-export const RAID_LAYOUT_VERSION = "th3-reference-layouts-v2";
+export const RAID_LAYOUT_VERSION = "th3-reference-layouts-v3";
 export const SNAPSHOT_VERIFIED_AT = "2026-07-11";
 export const ARMY_CAPACITY = 70;
 export const GRID = Object.freeze({ width: 48, height: 32 });
@@ -163,82 +163,104 @@ export const BUILDING_ROSTER = deepFreeze(
 );
 
 const FARM_111_BUILDING_POSITIONS = deepFreeze({
-  "townHall-1": point(22, 13),
-  "clanCastle-1": point(30, 21),
-  "armyCamp-1": point(36, 5),
-  "armyCamp-2": point(9, 23),
-  "barracks-1": point(12, 4),
-  "laboratory-1": point(9, 11),
-  "goldMine-1": point(7, 17),
-  "goldMine-2": point(36, 14),
+  "townHall-1": point(22, 15),
+  "clanCastle-1": point(30, 22),
+  "armyCamp-1": point(35, 6),
+  "armyCamp-2": point(8, 23),
+  "barracks-1": point(14, 5),
+  "laboratory-1": point(11, 10),
+  "goldMine-1": point(8, 17),
+  "goldMine-2": point(37, 14),
   "goldMine-3": point(23, 2),
-  "elixirCollector-1": point(30, 3),
-  "elixirCollector-2": point(14, 21),
-  "elixirCollector-3": point(25, 25),
-  "goldStorage-1": point(16, 9),
-  "goldStorage-2": point(34, 20),
-  "elixirStorage-1": point(27, 9),
+  "elixirCollector-1": point(31, 4),
+  "elixirCollector-2": point(14, 22),
+  "elixirCollector-3": point(23, 29),
+  "goldStorage-1": point(18, 11),
+  "goldStorage-2": point(30, 19),
+  "elixirStorage-1": point(29, 10),
   "elixirStorage-2": point(17, 21),
   "builderHut-1": point(8, 20),
-  "builderHut-2": point(40, 15),
-  "cannon-1": point(17, 13),
-  "cannon-2": point(28, 13),
-  "archerTower-1": point(22, 9),
-  "mortar-1": point(24, 21),
+  "builderHut-2": point(38, 20),
+  "cannon-1": point(15, 16),
+  "cannon-2": point(26, 17),
+  "archerTower-1": point(21, 9),
+  "mortar-1": point(22, 23),
 });
 
+const FARM_111_UPPER_COMPARTMENT = [
+  ...line(20, 8, 24, 8),
+  ...line(24, 8, 28, 12),
+  ...line(28, 12, 26, 14),
+  ...line(20, 8, 16, 12),
+];
+const FARM_111_LEFT_COMPARTMENT = [
+  ...line(16, 12, 20, 16),
+  ...line(20, 16, 22, 14),
+  ...line(16, 12, 13, 15),
+  ...line(18, 18, 21, 21),
+];
+const FARM_111_LOWER_RIGHT_COMPARTMENT = [
+  ...line(26, 14, 30, 18),
+  ...line(30, 18, 26, 22),
+  ...line(26, 22, 24, 20),
+  ...line(24, 20, 28, 24),
+  ...line(28, 24, 24, 28),
+  ...line(24, 28, 20, 24),
+  ...line(20, 24, 22, 22),
+];
 const FARM_111_WALLS = uniquePoints([
-  ...line(15, 8, 31, 8),
-  ...line(31, 9, 31, 17),
-  ...line(31, 17, 27, 17),
-  ...line(20, 17, 15, 17),
-  ...line(15, 16, 15, 9),
-  ...line(21, 12, 26, 12),
+  ...FARM_111_UPPER_COMPARTMENT,
+  ...FARM_111_LEFT_COMPARTMENT,
+  ...FARM_111_LOWER_RIGHT_COMPARTMENT,
 ]);
-const FARM_111_TRAPS = deepFreeze([point(20, 14), point(27, 16)]);
+const FARM_111_TRAPS = deepFreeze([point(27, 14), point(20, 17)]);
 
 const WAR_26_BUILDING_POSITIONS = deepFreeze({
-  "townHall-1": point(22, 15),
+  "townHall-1": point(22, 14),
   "clanCastle-1": point(27, 19),
   "armyCamp-1": point(5, 5),
   "armyCamp-2": point(38, 5),
   "barracks-1": point(23, 29),
   "laboratory-1": point(18, 19),
-  "goldMine-1": point(39, 12),
-  "goldMine-2": point(39, 18),
-  "goldMine-3": point(35, 24),
-  "elixirCollector-1": point(6, 11),
-  "elixirCollector-2": point(6, 17),
-  "elixirCollector-3": point(9, 23),
-  "goldStorage-1": point(14, 27),
-  "goldStorage-2": point(31, 27),
-  "elixirStorage-1": point(18, 11),
+  "goldMine-1": point(39, 11),
+  "goldMine-2": point(39, 17),
+  "goldMine-3": point(35, 23),
+  "elixirCollector-1": point(6, 10),
+  "elixirCollector-2": point(6, 16),
+  "elixirCollector-3": point(9, 22),
+  "goldStorage-1": point(16, 27),
+  "goldStorage-2": point(30, 27),
+  "elixirStorage-1": point(19, 11),
   "elixirStorage-2": point(27, 11),
   "builderHut-1": point(20, 1),
   "builderHut-2": point(27, 1),
-  "cannon-1": point(16, 15),
-  "cannon-2": point(29, 15),
-  "archerTower-1": point(23, 8),
-  "mortar-1": point(23, 21),
+  "cannon-1": point(16, 14),
+  "cannon-2": point(29, 14),
+  "archerTower-1": point(23, 7),
+  "mortar-1": point(23, 22),
 });
+const WAR_26_NORTH_EAST_WALL = line(24, 4, 36, 16);
+const WAR_26_SOUTH_EAST_WALL = line(36, 16, 24, 28);
+const WAR_26_SOUTH_WEST_WALL = line(24, 28, 12, 16);
+const WAR_26_NORTH_WEST_WALL = line(12, 16, 24, 4);
+const WAR_26_NORTH_AXIS = [point(23, 6), point(25, 6)];
 const WAR_26_WALLS = uniquePoints([
-  ...line(24, 4, 36, 16),
-  ...line(36, 16, 24, 28),
-  ...line(24, 28, 12, 16),
-  ...line(12, 16, 24, 4),
-  point(23, 6),
-  point(25, 6),
+  ...WAR_26_NORTH_EAST_WALL,
+  ...WAR_26_SOUTH_EAST_WALL,
+  ...WAR_26_SOUTH_WEST_WALL,
+  ...WAR_26_NORTH_WEST_WALL,
+  ...WAR_26_NORTH_AXIS,
 ]);
-const WAR_26_TRAPS = deepFreeze([point(20, 15), point(28, 16)]);
+const WAR_26_TRAPS = deepFreeze([point(20, 16), point(28, 16)]);
 
 const DEFENCE_104_BUILDING_POSITIONS = deepFreeze({
-  "townHall-1": point(22, 13),
+  "townHall-1": point(22, 14),
   "clanCastle-1": point(20, 19),
   "armyCamp-1": point(5, 6),
   "armyCamp-2": point(38, 6),
   "barracks-1": point(26, 19),
   "laboratory-1": point(23, 29),
-  "goldMine-1": point(7, 25),
+  "goldMine-1": point(12, 27),
   "goldMine-2": point(18, 29),
   "goldMine-3": point(30, 28),
   "elixirCollector-1": point(17, 1),
@@ -251,19 +273,23 @@ const DEFENCE_104_BUILDING_POSITIONS = deepFreeze({
   "builderHut-1": point(5, 15),
   "builderHut-2": point(41, 15),
   "cannon-1": point(17, 14),
-  "cannon-2": point(28, 14),
+  "cannon-2": point(29, 14),
   "archerTower-1": point(23, 22),
   "mortar-1": point(23, 7),
 });
+const DEFENCE_104_NORTH_EAST_WALL = line(24, 4, 36, 16);
+const DEFENCE_104_SOUTH_EAST_WALL = line(36, 16, 24, 28);
+const DEFENCE_104_SOUTH_WEST_WALL = line(24, 28, 12, 16);
+const DEFENCE_104_NORTH_WEST_WALL = line(12, 16, 24, 4);
+const DEFENCE_104_CORE_GAPS = [point(21, 17), point(26, 17)];
 const DEFENCE_104_WALLS = uniquePoints([
-  ...line(24, 4, 36, 16),
-  ...line(36, 16, 24, 28),
-  ...line(24, 28, 12, 16),
-  ...line(12, 16, 24, 4),
-  point(21, 17),
-  point(26, 17),
+  ...DEFENCE_104_NORTH_EAST_WALL,
+  ...DEFENCE_104_SOUTH_EAST_WALL,
+  ...DEFENCE_104_SOUTH_WEST_WALL,
+  ...DEFENCE_104_NORTH_WEST_WALL,
+  ...DEFENCE_104_CORE_GAPS,
 ]);
-const DEFENCE_104_TRAPS = deepFreeze([point(16, 21), point(32, 21)]);
+const DEFENCE_104_TRAPS = deepFreeze([point(20, 17), point(27, 17)]);
 
 export const LAYOUTS = deepFreeze([
   makeLayout("farm-111", FARM_111_BUILDING_POSITIONS, FARM_111_WALLS, FARM_111_TRAPS),

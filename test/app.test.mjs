@@ -737,7 +737,7 @@ test("Village Raid champions carry and enforce the profile, dataset, and layout 
   assert.equal(saved.hidden, 18);
   assert.equal(saved.outputs, 7);
   assert.equal(saved.datasetVersion, "th3-2026-07-11-v2");
-  assert.equal(saved.layoutVersion, "th3-reference-layouts-v2");
+  assert.equal(saved.layoutVersion, "th3-reference-layouts-v3");
   assert.equal(saved.genome.length, 817);
 
   for (const incompatible of [
@@ -770,7 +770,7 @@ test("Village Raid converts saturated output probabilities into a specialized ar
     hidden: 18,
     outputs: 7,
     datasetVersion: "th3-2026-07-11-v2",
-    layoutVersion: "th3-reference-layouts-v2",
+    layoutVersion: "th3-reference-layouts-v3",
   }));
   element(harness, "loadChampion").click();
   harness.runFrame();
@@ -794,7 +794,7 @@ test("Village Raid evaluates the three bases before advancing to the next specim
     hidden: 18,
     outputs: 7,
     datasetVersion: "th3-2026-07-11-v2",
-    layoutVersion: "th3-reference-layouts-v2",
+    layoutVersion: "th3-reference-layouts-v3",
   }));
   element(harness, "loadChampion").click();
   harness.runFrame();
@@ -835,7 +835,7 @@ test("Village Raid restores a depleted specialized army at each base transition"
     hidden: 18,
     outputs: 7,
     datasetVersion: "th3-2026-07-11-v2",
-    layoutVersion: "th3-reference-layouts-v2",
+    layoutVersion: "th3-reference-layouts-v3",
   }));
   element(harness, "loadChampion").click();
   harness.runFrame(3);

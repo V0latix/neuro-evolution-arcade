@@ -1,6 +1,8 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 
+import { EXPECTED_REFERENCE_LAYOUTS } from "./fixtures/village-raid-reference-layouts.mjs";
+
 import {
   LAYOUT_SOURCES,
   ARMY_CAPACITY,
@@ -200,7 +202,7 @@ test("normalized deployment positions cover only the common grid perimeter", () 
 });
 
 test("the three reference layouts preserve their source identity and exact inventory", () => {
-  assert.equal(RAID_LAYOUT_VERSION, "th3-reference-layouts-v2");
+  assert.equal(RAID_LAYOUT_VERSION, "th3-reference-layouts-v3");
   assert.deepEqual(LAYOUTS.map(({ id }) => id), ["farm-111", "war-26", "defence-104"]);
   assert.deepEqual(LAYOUT_SOURCES, {
     "farm-111": "https://clashofclans-layouts.com/fr/plans/th_3/farm_111.html",
@@ -224,6 +226,76 @@ test("the three reference layouts preserve their source identity and exact inven
       layout.id,
     );
   }
+});
+
+test("the independent screenshot fixture records every gameplay entity", () => {
+  assert.equal(
+    Object.values(EXPECTED_REFERENCE_LAYOUTS).reduce(
+      (total, layout) => total + Object.keys(layout.buildings).length,
+      0,
+    ),
+    66,
+  );
+  assert.equal(
+    Object.values(EXPECTED_REFERENCE_LAYOUTS).reduce(
+      (total, layout) => total + layout.walls.length,
+      0,
+    ),
+    150,
+  );
+  assert.equal(
+    Object.values(EXPECTED_REFERENCE_LAYOUTS).reduce(
+      (total, layout) => total + layout.traps.length,
+      0,
+    ),
+    6,
+  );
+});
+
+test("reference layouts exactly match the calibrated screenshot fixtures", () => {
+  assert.equal(RAID_LAYOUT_VERSION, "th3-reference-layouts-v3");
+  for (const layout of LAYOUTS) {
+    assert.deepEqual(layoutSignature(layout), EXPECTED_REFERENCE_LAYOUTS[layout.id], layout.id);
+  }
+});
+
+test("farm-111 preserves the screenshot wall junctions and small compartments", () => {
+  const layout = LAYOUTS.find(({ id }) => id === "farm-111");
+  const walls = new Set(layout.walls.map(({ x, y }) => `${x},${y}`));
+
+  for (const [label, points] of Object.entries({
+    "Town Hall junctions": [[22, 14], [21, 15], [24, 20], [25, 21], [26, 22]],
+    "left compartment": [[13, 15], [18, 18], [19, 19]],
+    "upper compartment": [[20, 8], [24, 8], [16, 12], [28, 12]],
+    "lower-right compartment": [[30, 18], [28, 24], [24, 28]],
+  })) {
+    assert.ok(points.every(([x, y]) => walls.has(`${x},${y}`)), label);
+  }
+});
+
+test("war-26 preserves the screenshot axes and exterior resource groups", () => {
+  const layout = LAYOUTS.find(({ id }) => id === "war-26");
+  const byId = Object.fromEntries(layout.buildings.map((building) => [building.id, building]));
+  assert.ok(byId["builderHut-1"].y < byId["archerTower-1"].y);
+  assert.ok(byId["builderHut-2"].y < byId["archerTower-1"].y);
+  assert.ok(byId["elixirCollector-1"].x < byId["townHall-1"].x);
+  assert.ok(byId["goldMine-1"].x > byId["townHall-1"].x);
+  assert.ok(byId["barracks-1"].y > byId["townHall-1"].y);
+});
+
+test("defence-104 preserves north resources, south mines, and opposite huts", () => {
+  const layout = LAYOUTS.find(({ id }) => id === "defence-104");
+  const townHall = layout.buildings.find(({ type }) => type === "townHall");
+  assert.ok(
+    layout.buildings.filter(({ type }) => type === "elixirCollector").every(({ y }) => y < townHall.y),
+  );
+  assert.ok(
+    layout.buildings.filter(({ type }) => type === "goldMine").every(({ y }) => y > townHall.y),
+  );
+  const huts = layout.buildings
+    .filter(({ type }) => type === "builderHut")
+    .sort((a, b) => a.x - b.x);
+  assert.ok(huts[0].x < townHall.x && huts[1].x > townHall.x);
 });
 
 test("reference anchors preserve the screenshots' enclosure relationships", () => {
@@ -331,4 +403,20 @@ test("layout validation reports missing, duplicate, overlapping and off-grid ent
 
 function pick(value, keys) {
   return Object.fromEntries(keys.map((key) => [key, value[key]]));
+}
+
+function layoutSignature(layout) {
+  return {
+    buildings: Object.fromEntries(
+      layout.buildings
+        .map(({ id, x, y }) => [id, [x, y]])
+        .sort(([left], [right]) => left.localeCompare(right)),
+    ),
+    walls: layout.walls.map(({ x, y }) => [x, y]).sort(comparePoints),
+    traps: layout.traps.map(({ x, y }) => [x, y]).sort(comparePoints),
+  };
+}
+
+function comparePoints([leftX, leftY], [rightX, rightY]) {
+  return leftY - rightY || leftX - rightX;
 }
