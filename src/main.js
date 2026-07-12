@@ -615,7 +615,10 @@ function formatRaidArmy(army = {}) {
 function loop() {
   if (running) {
     const steps = playMode === "human" ? 1 : Number(ui.speed.value);
-    for (let i = 0; i < steps; i += 1) step();
+    for (let i = 0; i < steps; i += 1) {
+      step();
+      if (game.consumeSimulationFrameYield?.(world)) break;
+    }
   }
 
   drawGame();
@@ -3384,6 +3387,7 @@ function createVillageRaidGame() {
     const plan = createRaidBasePlan(baseIndex, agent.composition);
     targetWorld.raidBaseIndex = plan.baseIndex;
     targetWorld.raidWorld = createRaidWorld(plan.baseIndex, plan.composition);
+    targetWorld.raidTerminalPending = false;
   }
 
   function finishBase(agent, targetWorld) {
@@ -3427,7 +3431,13 @@ function createVillageRaidGame() {
     defaultChampionStatus: "No Village Raid HDV 3 champion saved yet.",
     humanNetworkMessage: "Village Raid is trained by AI specimens only.",
     createWorld() {
-      return { activeAgentIndex: 0, raidBaseIndex: 0, raidWorld: null };
+      return {
+        activeAgentIndex: 0,
+        raidBaseIndex: 0,
+        raidWorld: null,
+        raidTerminalPending: false,
+        raidFrameYieldPending: false,
+      };
     },
     makeAgent(id, genome) {
       return { id, genome, alive: false, fitness: 0, score: 0, composition: null, raidResults: [] };
@@ -3437,6 +3447,8 @@ function createVillageRaidGame() {
       targetWorld.activeAgentIndex = 0;
       targetWorld.raidBaseIndex = 0;
       targetWorld.raidWorld = null;
+      targetWorld.raidTerminalPending = false;
+      targetWorld.raidFrameYieldPending = false;
       for (const agent of nextAgents) {
         agent.alive = false;
         agent.fitness = 0;
@@ -3456,6 +3468,12 @@ function createVillageRaidGame() {
     },
     stepWorld() {},
     updateAgent(agent, targetWorld) {
+      if (targetWorld.raidTerminalPending) {
+        targetWorld.raidTerminalPending = false;
+        finishBase(agent, targetWorld);
+        targetWorld.raidFrameYieldPending = true;
+        return;
+      }
       const raidWorld = targetWorld.raidWorld;
       const outputs = feedForward(agent.genome, getRaidObservation(raidWorld), this);
       const type = chooseAvailableTroop(outputs.slice(0, 5), raidWorld.inventory);
@@ -3464,7 +3482,15 @@ function createVillageRaidGame() {
         type,
         normalizedPosition: outputs[5],
       });
-      if (raidWorld.complete) finishBase(agent, targetWorld);
+      if (raidWorld.complete) {
+        targetWorld.raidTerminalPending = true;
+        targetWorld.raidFrameYieldPending = true;
+      }
+    },
+    consumeSimulationFrameYield(targetWorld) {
+      const shouldYield = targetWorld.raidFrameYieldPending;
+      targetWorld.raidFrameYieldPending = false;
+      return shouldYield;
     },
     sequentialScore(_nextAgents, targetWorld) {
       return targetWorld.raidWorld ? destructionPercent(targetWorld.raidWorld) : 0;

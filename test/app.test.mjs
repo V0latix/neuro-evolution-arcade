@@ -911,20 +911,54 @@ test("Village Raid evaluates the three bases before advancing to the next specim
   const composition = element(harness, "raidComposition").textContent;
   const firstInventory = element(harness, "raidInventory").textContent;
 
-  harness.runFrame(35);
+  runUntil(harness, () => element(harness, "raidBase").textContent === "2/3", 40);
   assert.equal(element(harness, "alive").textContent, "1/24");
   assert.equal(element(harness, "raidBase").textContent, "2/3");
   assert.equal(element(harness, "raidComposition").textContent, composition);
   assert.equal(element(harness, "raidInventory").textContent, firstInventory);
-  harness.runFrame(36);
+  runUntil(harness, () => element(harness, "raidBase").textContent === "3/3", 40);
   assert.equal(element(harness, "alive").textContent, "1/24");
   assert.equal(element(harness, "raidBase").textContent, "3/3");
   assert.equal(element(harness, "raidComposition").textContent, composition);
   assert.equal(element(harness, "raidInventory").textContent, firstInventory);
-  harness.runFrame(36);
+  runUntil(harness, () => element(harness, "alive").textContent === "2/24", 40);
   assert.equal(element(harness, "alive").textContent, "2/24");
   assert.equal(element(harness, "raidBase").textContent, "1/3");
   assert.equal(element(harness, "bestScore").textContent, "0.00%");
+});
+
+test("Village Raid renders timeout zero before resetting the next base at high speed", async () => {
+  const harness = await loadHarness();
+  const context = element(harness, "game").getContext();
+  element(harness, "gameRaid").click();
+  element(harness, "speed").value = 30;
+  harness.storage.setItem(raidChampionStorageKey, JSON.stringify({
+    game: "raid",
+    genome: Array.from({ length: 817 }, () => 0),
+    inputs: 37,
+    hidden: 18,
+    outputs: 7,
+    datasetVersion: "th3-2026-07-11-v2",
+    layoutVersion: "th3-reference-layouts-v3",
+  }));
+  element(harness, "loadChampion").click();
+
+  context.calls.length = 0;
+  runUntil(harness, () => element(harness, "raidTime").textContent === "0 s", 121);
+  assert.equal(element(harness, "raidBase").textContent, "1/3");
+  assert.equal(
+    context.calls.filter(({ type, text }) => type === "fillText" && text.startsWith("Temps ")).at(-1)?.text,
+    "Temps 0 s",
+  );
+
+  context.calls.length = 0;
+  harness.runFrame();
+  assert.equal(element(harness, "raidBase").textContent, "2/3");
+  assert.equal(element(harness, "raidTime").textContent, "180 s");
+  assert.equal(
+    context.calls.filter(({ type, text }) => type === "fillText" && text.startsWith("Temps ")).at(-1)?.text,
+    "Temps 180 s",
+  );
 });
 
 test("Village Raid restores a depleted specialized army at each base transition", async () => {
