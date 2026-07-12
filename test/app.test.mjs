@@ -320,6 +320,7 @@ test("static app includes every primary control and asset reference", async () =
     "raidLegendGoblin",
     "raidLegendWallBreaker",
     "raidBase",
+    "raidTime",
     "raidComposition",
     "raidInventory",
     "raidAverage",
@@ -650,6 +651,8 @@ test("game picker switches to AI-only Village Raid with its profile and HUD", as
   const harness = await loadHarness();
 
   element(harness, "gameRaid").click();
+  assert.equal(element(harness, "speed").value, 30);
+  element(harness, "speed").value = 1;
   harness.runFrame();
 
   assert.equal(element(harness, "activeGameTitle").textContent, "Village Raid HDV 3");
@@ -658,7 +661,6 @@ test("game picker switches to AI-only Village Raid with its profile and HUD", as
   assert.equal(element(harness, "alive").textContent, "1/24");
   assert.equal(element(harness, "population").value, 24);
   assert.equal(element(harness, "mutation").value, "0.12");
-  assert.equal(element(harness, "speed").value, 30);
   assert.equal(element(harness, "speed").max, 100);
   assert.equal(element(harness, "raidPanel").hidden, false);
   assert.equal(element(harness, "raidTroopLegend").hidden, false);
@@ -667,9 +669,15 @@ test("game picker switches to AI-only Village Raid with its profile and HUD", as
   assert.equal(element(harness, "presetPanel").hidden, true);
   assert.equal(element(harness, "modeHuman").disabled, true);
   assert.equal(element(harness, "raidBase").textContent, "1/3");
+  assert.equal(element(harness, "raidTime").textContent, "180 s");
   assert.match(element(harness, "raidComposition").textContent, /Barbares/);
   assert.match(element(harness, "raidInventory").textContent, /Barbares/);
   assert.equal(element(harness, "raidAverage").textContent, "0.00%");
+  assert.ok(
+    element(harness, "game").getContext().calls.some(
+      (call) => call.type === "fillText" && call.text === "Temps 180 s",
+    ),
+  );
 
   const html = await readFile(new URL("../index.html", import.meta.url), "utf8");
   assert.match(html, /Cible : defenses/);
@@ -696,6 +704,12 @@ test("game picker switches to AI-only Village Raid with its profile and HUD", as
     Math.abs(raidOverlayLabels[0].y - raidOverlayLabels[1].y) >= 18,
     "raid destruction and average labels need separate readable lines",
   );
+
+  harness.runFrame(19);
+  assert.equal(element(harness, "raidTime").textContent, "179 s");
+  const raidTimeLabels = element(harness, "game").getContext().calls
+    .filter((call) => call.type === "fillText" && call.text.startsWith("Temps "));
+  assert.equal(raidTimeLabels.at(-1)?.text, "Temps 179 s");
 
   const troopKeyLabels = element(harness, "game").getContext().calls
     .filter((call) => call.type === "fillText")
@@ -845,11 +859,13 @@ test("Village Raid restores a depleted specialized army at each base transition"
   assert.match(element(harness, "raidInventory").textContent, /^Barbares 69\b/);
 
   runUntil(harness, () => element(harness, "raidBase").textContent === "2/3", 3601);
+  assert.equal(element(harness, "raidTime").textContent, "180 s");
   assert.equal(element(harness, "raidInventory").textContent, fullArmy);
   harness.runFrame(3);
   assert.match(element(harness, "raidInventory").textContent, /^Barbares 69\b/);
 
   runUntil(harness, () => element(harness, "raidBase").textContent === "3/3", 3601);
+  assert.equal(element(harness, "raidTime").textContent, "180 s");
   assert.equal(element(harness, "raidInventory").textContent, fullArmy);
 });
 

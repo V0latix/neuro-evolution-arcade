@@ -21,6 +21,7 @@ import {
   createRaidWorld,
   destructionPercent,
   getRaidObservation,
+  raidSecondsRemaining,
   stepRaid,
 } from "./village-raid-simulation.js";
 import {
@@ -93,6 +94,7 @@ const ui = {
   explanationRaid: document.querySelector("#explanationRaid"),
   raidPanel: document.querySelector("#raidPanel"),
   raidBase: document.querySelector("#raidBase"),
+  raidTime: document.querySelector("#raidTime"),
   raidComposition: document.querySelector("#raidComposition"),
   raidInventory: document.querySelector("#raidInventory"),
   raidLegendBarbarian: document.querySelector("#raidLegendBarbarian"),
@@ -584,6 +586,7 @@ function updateUi() {
 function updateRaidPanel(agent, targetWorld) {
   const raidWorld = targetWorld?.raidWorld;
   ui.raidBase.textContent = `${(targetWorld?.raidBaseIndex ?? 0) + 1}/3`;
+  ui.raidTime.textContent = `${raidWorld ? raidSecondsRemaining(raidWorld) : 180} s`;
   ui.raidComposition.textContent = formatRaidArmy(agent?.composition);
   ui.raidInventory.textContent = formatRaidArmy(raidWorld?.inventory);
   for (const [type, output] of Object.entries(RAID_LEGEND_OUTPUTS)) {
@@ -3542,13 +3545,14 @@ function drawRaidWorld(targetCtx, targetWorld, agent) {
   const completed = agent?.raidResults || [];
   const average = (completed.reduce((sum, value) => sum + value, 0) + current) / (completed.length + 1);
   targetCtx.fillStyle = "rgba(255,255,255,0.9)";
-  targetCtx.fillRect(18, 18, 280, 86);
+  targetCtx.fillRect(18, 18, 280, 108);
   targetCtx.fillStyle = "#172026";
   targetCtx.font = "800 17px system-ui";
   targetCtx.fillText(`Base ${targetWorld.raidBaseIndex + 1}/3`, 32, 43);
   targetCtx.font = "700 14px system-ui";
-  targetCtx.fillText(`Destruction ${current.toFixed(2)}%`, 32, 65);
-  targetCtx.fillText(`Moyenne ${average.toFixed(2)}%`, 32, 87);
+  targetCtx.fillText(`Temps ${raidSecondsRemaining(raidWorld)} s`, 32, 65);
+  targetCtx.fillText(`Destruction ${current.toFixed(2)}%`, 32, 87);
+  targetCtx.fillText(`Moyenne ${average.toFixed(2)}%`, 32, 109);
 }
 
 
