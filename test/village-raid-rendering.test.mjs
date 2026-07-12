@@ -4,8 +4,10 @@ import {
   RAID_BUILDING_NAMES,
   RAID_TROOP_VISUALS,
   drawRaidBuilding,
+  drawRaidBuildingTooltip,
   drawRaidTroop,
   drawRaidTroopKey,
+  findRaidBuildingAtPoint,
 } from "../src/village-raid-rendering.js";
 import { BUILDING_DEFINITIONS } from "../src/village-raid-data.js";
 
@@ -25,6 +27,56 @@ test("building names expose all 13 French inspection labels", () => {
     archerTower: "Tour d'archers",
     mortar: "Mortier",
   });
+});
+
+test("building hit testing respects complete footprints and living state", () => {
+  const buildings = [
+    { id: "cannon-1", x: 4, y: 5, width: 3, height: 3, hp: 100 },
+    { id: "mortar-1", x: 10, y: 5, width: 3, height: 3, hp: 0 },
+  ];
+
+  assert.equal(findRaidBuildingAtPoint(buildings, { x: 44, y: 42 }, 10, 8)?.id, "cannon-1");
+  assert.equal(findRaidBuildingAtPoint(buildings, { x: 65.9, y: 63.9 }, 10, 8)?.id, "cannon-1");
+  assert.equal(findRaidBuildingAtPoint(buildings, { x: 66, y: 64 }, 10, 8), null);
+  assert.equal(findRaidBuildingAtPoint(buildings, { x: 94, y: 42 }, 10, 8), null);
+});
+
+test("building tooltip shows French name, level, and rounded current/max HP", () => {
+  const ctx = recordingContext();
+  drawRaidBuildingTooltip(ctx, {
+    ...buildingFixture("townHall"),
+    level: 3,
+    hp: 1234.4,
+    maxHp: 1600.2,
+  }, 0, 10, 320, 180);
+
+  assert.deepEqual(
+    ctx.calls.filter(({ type }) => type === "fillText").map(({ text }) => text),
+    ["Hotel de ville", "Niv. 3", "HP 1234/1600"],
+  );
+});
+
+test("building tooltip solid rectangle stays within every Canvas edge", () => {
+  for (const [label, x, y] of [
+    ["top-left", -3, -2],
+    ["top-right", 9, -2],
+    ["bottom-left", -3, 7],
+    ["bottom-right", 9, 7],
+  ]) {
+    const ctx = recordingContext();
+    drawRaidBuildingTooltip(ctx, {
+      ...buildingFixture("archerTower"),
+      x,
+      y,
+      level: 3,
+    }, 0, 10, 120, 90);
+    const box = ctx.calls.find((call) =>
+      call.type === "fillRect" && call.fillStyle === "#172026"
+    );
+    assert.ok(box, `${label} tooltip box`);
+    assert.ok(box.x >= 0 && box.x + box.width <= 120, `${label} x clamp`);
+    assert.ok(box.y >= 0 && box.y + box.height <= 90, `${label} y clamp`);
+  }
 });
 
 test("all 13 building types draw their own recognizable label-free cues", () => {
@@ -396,5 +448,6 @@ function recordingContext() {
       },
     });
   }
+  ctx.measureText = (text) => ({ width: text.length * 7 });
   return ctx;
 }

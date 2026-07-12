@@ -38,6 +38,46 @@ const BUILDING_PALETTES = Object.freeze({
   mortar: ["#59636f", "#242a31"],
 });
 
+export function findRaidBuildingAtPoint(buildings, point, offsetX, tile) {
+  return buildings.find((building) => {
+    if (building.hp <= 0) return false;
+    const left = offsetX + building.x * tile;
+    const top = building.y * tile;
+    return point.x >= left && point.x < left + building.width * tile &&
+      point.y >= top && point.y < top + building.height * tile;
+  }) ?? null;
+}
+
+export function drawRaidBuildingTooltip(ctx, building, offsetX, tile, canvasWidth, canvasHeight) {
+  ctx.save();
+  ctx.font = "700 13px system-ui";
+  const lines = [
+    RAID_BUILDING_NAMES[building.type] ?? building.type,
+    `Niv. ${building.level}`,
+    `HP ${Math.round(building.hp)}/${Math.round(building.maxHp)}`,
+  ];
+  const padding = 8;
+  const lineHeight = 17;
+  const boxWidth = Math.min(
+    canvasWidth,
+    Math.max(...lines.map((line) => ctx.measureText(line).width)) + padding * 2,
+  );
+  const boxHeight = Math.min(canvasHeight, lines.length * lineHeight + padding * 2);
+  const buildingLeft = offsetX + building.x * tile;
+  const buildingTop = building.y * tile;
+  const buildingRight = buildingLeft + building.width * tile;
+  const x = clamp(buildingRight + 8, 0, canvasWidth - boxWidth);
+  const y = clamp(buildingTop - boxHeight - 8, 0, canvasHeight - boxHeight);
+
+  ctx.fillStyle = "#172026";
+  ctx.fillRect(x, y, boxWidth, boxHeight);
+  ctx.fillStyle = "#ffffff";
+  for (const [index, line] of lines.entries()) {
+    ctx.fillText(line, x + padding, y + padding + 13 + index * lineHeight);
+  }
+  ctx.restore();
+}
+
 export function drawRaidBuilding(ctx, building, offsetX, tile) {
   if (building.hp <= 0) return;
 
@@ -365,4 +405,8 @@ function drawHealthBar(ctx, x, y, width, hp, maxHp) {
   ctx.fillRect(x, y, width, 3);
   ctx.fillStyle = "#48c774";
   ctx.fillRect(x, y, width * ratio, 3);
+}
+
+function clamp(value, min, max) {
+  return Math.max(min, Math.min(max, value));
 }

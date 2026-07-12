@@ -5,6 +5,7 @@ import { join } from "node:path";
 import { test } from "node:test";
 import { pathToFileURL } from "node:url";
 import { promisify } from "node:util";
+import { GRID as RAID_GRID, LAYOUTS as RAID_LAYOUTS } from "../src/village-raid-data.js";
 
 const root = new URL("../", import.meta.url);
 const pipeChampionStorageKey = "neuro-evolution-arcade.pipe-runner.champion";
@@ -82,6 +83,10 @@ class MockElement {
   getContext() {
     return this.context;
   }
+
+  getBoundingClientRect() {
+    return { left: 100, top: 50, width: 480, height: 270 };
+  }
 }
 
 class MockDocument {
@@ -147,6 +152,9 @@ function createMockContext() {
     setLineDash() {},
     createLinearGradient() {
       return { addColorStop() {} };
+    },
+    measureText(text) {
+      return { width: text.length * 7 };
     },
     fillText(text, x, y) {
       calls.push({ type: "fillText", text, x, y });
@@ -738,6 +746,88 @@ test("game picker switches to AI-only Village Raid with its profile and HUD", as
   assert.equal(element(harness, "modeHuman").disabled, false);
   assert.equal(element(harness, "raidPanel").hidden, true);
 });
+
+test("Village Raid inspects living buildings on hover and click without permanent labels", async () => {
+  const harness = await loadHarness();
+  const canvas = element(harness, "game");
+  const context = canvas.getContext();
+  element(harness, "gameRaid").click();
+  element(harness, "toggleRun").click();
+  harness.runFrame();
+
+  const townHall = RAID_LAYOUTS[0].buildings.find(({ type }) => type === "townHall");
+  const tile = Math.min(960 / RAID_GRID.width, 560 / RAID_GRID.height);
+  const offsetX = (960 - RAID_GRID.width * tile) / 2;
+  const center = {
+    x: offsetX + (townHall.x + townHall.width / 2) * tile,
+    y: (townHall.y + townHall.height / 2) * tile,
+  };
+  const clientPoint = canvasClientPoint(canvas, center);
+
+  context.calls.length = 0;
+  canvas.dispatchEvent({ type: "pointermove", ...clientPoint });
+  harness.runFrame();
+  assert.deepEqual(raidInspectionLabels(context), [
+    "Hotel de ville", `Niv. ${townHall.level}`, `HP ${townHall.hp}/${townHall.hp}`,
+  ]);
+
+  context.calls.length = 0;
+  canvas.dispatchEvent({ type: "pointerleave" });
+  harness.runFrame();
+  assert.deepEqual(raidInspectionLabels(context), []);
+
+  canvas.dispatchEvent({ type: "click", ...clientPoint, preventDefault() {} });
+  const emptyClientPoint = canvasClientPoint(canvas, { x: 4, y: 530 });
+  canvas.dispatchEvent({ type: "pointermove", ...emptyClientPoint });
+  context.calls.length = 0;
+  harness.runFrame();
+  assert.deepEqual(raidInspectionLabels(context), [
+    "Hotel de ville", `Niv. ${townHall.level}`, `HP ${townHall.hp}/${townHall.hp}`,
+  ]);
+
+  canvas.dispatchEvent({ type: "click", ...emptyClientPoint, preventDefault() {} });
+  context.calls.length = 0;
+  harness.runFrame();
+  assert.deepEqual(raidInspectionLabels(context), []);
+
+  canvas.dispatchEvent({ type: "click", ...clientPoint, preventDefault() {} });
+  element(harness, "reset").click();
+  context.calls.length = 0;
+  harness.runFrame();
+  assert.deepEqual(raidInspectionLabels(context), [], "reset clears pinned inspection");
+
+  canvas.dispatchEvent({ type: "click", ...clientPoint, preventDefault() {} });
+  element(harness, "gamePipe").click();
+  element(harness, "gameRaid").click();
+  element(harness, "toggleRun").click();
+  context.calls.length = 0;
+  harness.runFrame();
+  assert.deepEqual(raidInspectionLabels(context), [], "game switching clears pinned inspection");
+
+  canvas.dispatchEvent({ type: "click", ...clientPoint, preventDefault() {} });
+  element(harness, "speed").value = 100;
+  element(harness, "toggleRun").click();
+  runUntil(harness, () => element(harness, "raidBase").textContent === "2/3", 50);
+  element(harness, "toggleRun").click();
+  context.calls.length = 0;
+  harness.runFrame();
+  assert.deepEqual(raidInspectionLabels(context), [], "base transition clears pinned inspection");
+});
+
+function canvasClientPoint(canvas, point) {
+  const rect = canvas.getBoundingClientRect();
+  return {
+    clientX: rect.left + point.x / 960 * rect.width,
+    clientY: rect.top + point.y / 560 * rect.height,
+  };
+}
+
+function raidInspectionLabels(context) {
+  return context.calls
+    .filter(({ type, text }) => type === "fillText" &&
+      (/^(Niv\. |HP )/.test(text) || text === "Hotel de ville"))
+    .map(({ text }) => text);
+}
 
 test("Village Raid champions carry and enforce the profile, dataset, and layout versions", async () => {
   const harness = await loadHarness();
