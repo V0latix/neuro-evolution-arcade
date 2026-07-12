@@ -21,12 +21,15 @@ import {
   createRaidWorld,
   destructionPercent,
   getRaidObservation,
+  raidSecondsRemaining,
   stepRaid,
 } from "./village-raid-simulation.js";
 import {
   drawRaidBuilding,
+  drawRaidBuildingTooltip,
   drawRaidTroop,
   drawRaidTroopKey,
+  findRaidBuildingAtPoint,
 } from "./village-raid-rendering.js";
 import {
   createRaidBasePlan,
@@ -93,6 +96,7 @@ const ui = {
   explanationRaid: document.querySelector("#explanationRaid"),
   raidPanel: document.querySelector("#raidPanel"),
   raidBase: document.querySelector("#raidBase"),
+  raidTime: document.querySelector("#raidTime"),
   raidComposition: document.querySelector("#raidComposition"),
   raidInventory: document.querySelector("#raidInventory"),
   raidLegendBarbarian: document.querySelector("#raidLegendBarbarian"),
@@ -178,6 +182,8 @@ const RAID_INPUT_DISPLAY_LABELS = [
 ];
 
 let formulaTrainingSession = createFormulaTrainingSession();
+let raidHoveredBuildingId = null;
+let raidSelectedBuildingId = null;
 
 const games = {
   pipe: createPipeGame(),
@@ -584,6 +590,7 @@ function updateUi() {
 function updateRaidPanel(agent, targetWorld) {
   const raidWorld = targetWorld?.raidWorld;
   ui.raidBase.textContent = `${(targetWorld?.raidBaseIndex ?? 0) + 1}/3`;
+  ui.raidTime.textContent = `${raidWorld ? raidSecondsRemaining(raidWorld) : 180} s`;
   ui.raidComposition.textContent = formatRaidArmy(agent?.composition);
   ui.raidInventory.textContent = formatRaidArmy(raidWorld?.inventory);
   for (const [type, output] of Object.entries(RAID_LEGEND_OUTPUTS)) {
@@ -608,7 +615,10 @@ function formatRaidArmy(army = {}) {
 function loop() {
   if (running) {
     const steps = playMode === "human" ? 1 : Number(ui.speed.value);
-    for (let i = 0; i < steps; i += 1) step();
+    for (let i = 0; i < steps; i += 1) {
+      step();
+      if (game.consumeSimulationFrameYield?.(world)) break;
+    }
   }
 
   drawGame();
@@ -633,6 +643,7 @@ function restartTraining(clearChampion = true) {
 }
 
 function resetAll({ resetFormulaSession = true } = {}) {
+  resetRaidInspection();
   if (resetFormulaSession && activeGameKey === "formula") {
     formulaTrainingSession = resetFormulaTrainingSession();
   }
@@ -667,6 +678,7 @@ function setMode(mode) {
 
 function setGame(nextGameKey) {
   if (activeGameKey === nextGameKey) return;
+  resetRaidInspection();
   const resetsFormulaSession = activeGameKey === "formula" || nextGameKey === "formula";
   activeGameKey = nextGameKey;
   game = games[activeGameKey];
@@ -3371,9 +3383,12 @@ function createVillageRaidGame() {
   }
 
   function beginBase(agent, targetWorld, baseIndex) {
+    resetRaidInspection();
     const plan = createRaidBasePlan(baseIndex, agent.composition);
     targetWorld.raidBaseIndex = plan.baseIndex;
     targetWorld.raidWorld = createRaidWorld(plan.baseIndex, plan.composition);
+    targetWorld.raidTerminalPending = false;
+    targetWorld.raidStartFramePending = !targetWorld.raidFrameYieldPending;
   }
 
   function finishBase(agent, targetWorld) {
@@ -3417,15 +3432,26 @@ function createVillageRaidGame() {
     defaultChampionStatus: "No Village Raid HDV 3 champion saved yet.",
     humanNetworkMessage: "Village Raid is trained by AI specimens only.",
     createWorld() {
-      return { activeAgentIndex: 0, raidBaseIndex: 0, raidWorld: null };
+      return {
+        activeAgentIndex: 0,
+        raidBaseIndex: 0,
+        raidWorld: null,
+        raidTerminalPending: false,
+        raidStartFramePending: false,
+        raidFrameYieldPending: false,
+      };
     },
     makeAgent(id, genome) {
       return { id, genome, alive: false, fitness: 0, score: 0, composition: null, raidResults: [] };
     },
     resetAgents(nextAgents, targetWorld) {
+      resetRaidInspection();
       targetWorld.activeAgentIndex = 0;
       targetWorld.raidBaseIndex = 0;
       targetWorld.raidWorld = null;
+      targetWorld.raidTerminalPending = false;
+      targetWorld.raidStartFramePending = false;
+      targetWorld.raidFrameYieldPending = false;
       for (const agent of nextAgents) {
         agent.alive = false;
         agent.fitness = 0;
@@ -3445,6 +3471,18 @@ function createVillageRaidGame() {
     },
     stepWorld() {},
     updateAgent(agent, targetWorld) {
+      if (targetWorld.raidStartFramePending) {
+        targetWorld.raidStartFramePending = false;
+        targetWorld.raidFrameYieldPending = true;
+        return;
+      }
+      if (targetWorld.raidTerminalPending) {
+        targetWorld.raidTerminalPending = false;
+        finishBase(agent, targetWorld);
+        targetWorld.raidStartFramePending = false;
+        targetWorld.raidFrameYieldPending = true;
+        return;
+      }
       const raidWorld = targetWorld.raidWorld;
       const outputs = feedForward(agent.genome, getRaidObservation(raidWorld), this);
       const type = chooseAvailableTroop(outputs.slice(0, 5), raidWorld.inventory);
@@ -3453,7 +3491,15 @@ function createVillageRaidGame() {
         type,
         normalizedPosition: outputs[5],
       });
-      if (raidWorld.complete) finishBase(agent, targetWorld);
+      if (raidWorld.complete) {
+        targetWorld.raidTerminalPending = true;
+        targetWorld.raidFrameYieldPending = true;
+      }
+    },
+    consumeSimulationFrameYield(targetWorld) {
+      const shouldYield = targetWorld.raidFrameYieldPending;
+      targetWorld.raidFrameYieldPending = false;
+      return shouldYield;
     },
     sequentialScore(_nextAgents, targetWorld) {
       return targetWorld.raidWorld ? destructionPercent(targetWorld.raidWorld) : 0;
@@ -3470,6 +3516,22 @@ function createVillageRaidGame() {
     distanceMetric(_agent, targetWorld) {
       return targetWorld.raidWorld ? `${destructionPercent(targetWorld.raidWorld).toFixed(2)}%` : "0.00%";
     },
+    handleCanvasPointerMove(point, targetWorld) {
+      const geometry = raidCanvasGeometry();
+      raidHoveredBuildingId = findRaidBuildingAtPoint(
+        targetWorld.raidWorld?.buildings ?? [], point, geometry.offsetX, geometry.tile,
+      )?.id ?? null;
+    },
+    handleCanvasPointerLeave() {
+      raidHoveredBuildingId = null;
+    },
+    handleCanvasClick(point, targetWorld) {
+      const geometry = raidCanvasGeometry();
+      raidSelectedBuildingId = findRaidBuildingAtPoint(
+        targetWorld.raidWorld?.buildings ?? [], point, geometry.offsetX, geometry.tile,
+      )?.id ?? null;
+      return true;
+    },
     draw(targetCtx, targetWorld, visibleAgents) {
       drawRaidWorld(targetCtx, targetWorld, visibleAgents[0]);
     },
@@ -3485,8 +3547,7 @@ function probabilitiesToLogits(probabilities) {
 
 function drawRaidWorld(targetCtx, targetWorld, agent) {
   const raidWorld = targetWorld?.raidWorld;
-  const tile = Math.min(WIDTH / RAID_GRID.width, HEIGHT / RAID_GRID.height);
-  const offsetX = (WIDTH - RAID_GRID.width * tile) / 2;
+  const { tile, offsetX } = raidCanvasGeometry();
   targetCtx.fillStyle = "#d9edc2";
   targetCtx.fillRect(0, 0, WIDTH, HEIGHT);
   targetCtx.fillStyle = "#b9d99a";
@@ -3536,19 +3597,37 @@ function drawRaidWorld(targetCtx, targetWorld, agent) {
   for (const troop of raidWorld.troops) {
     if (troop.alive) drawRaidTroop(targetCtx, troop, offsetX, tile);
   }
+  const inspectedId = raidHoveredBuildingId ?? raidSelectedBuildingId;
+  const inspectedBuilding = raidWorld.buildings.find((building) =>
+    building.id === inspectedId && building.hp > 0
+  );
+  if (inspectedBuilding) {
+    drawRaidBuildingTooltip(targetCtx, inspectedBuilding, offsetX, tile, WIDTH, HEIGHT);
+  }
   drawRaidTroopKey(targetCtx, WIDTH - 220, 18);
 
   const current = destructionPercent(raidWorld);
   const completed = agent?.raidResults || [];
   const average = (completed.reduce((sum, value) => sum + value, 0) + current) / (completed.length + 1);
   targetCtx.fillStyle = "rgba(255,255,255,0.9)";
-  targetCtx.fillRect(18, 18, 280, 86);
+  targetCtx.fillRect(18, 18, 280, 108);
   targetCtx.fillStyle = "#172026";
   targetCtx.font = "800 17px system-ui";
   targetCtx.fillText(`Base ${targetWorld.raidBaseIndex + 1}/3`, 32, 43);
   targetCtx.font = "700 14px system-ui";
-  targetCtx.fillText(`Destruction ${current.toFixed(2)}%`, 32, 65);
-  targetCtx.fillText(`Moyenne ${average.toFixed(2)}%`, 32, 87);
+  targetCtx.fillText(`Temps ${raidSecondsRemaining(raidWorld)} s`, 32, 65);
+  targetCtx.fillText(`Destruction ${current.toFixed(2)}%`, 32, 87);
+  targetCtx.fillText(`Moyenne ${average.toFixed(2)}%`, 32, 109);
+}
+
+function raidCanvasGeometry() {
+  const tile = Math.min(WIDTH / RAID_GRID.width, HEIGHT / RAID_GRID.height);
+  return { tile, offsetX: (WIDTH - RAID_GRID.width * tile) / 2 };
+}
+
+function resetRaidInspection() {
+  raidHoveredBuildingId = null;
+  raidSelectedBuildingId = null;
 }
 
 
@@ -3574,16 +3653,30 @@ function drawCrashOverlay(targetCtx, mode, agent, message) {
   targetCtx.textAlign = "left";
 }
 
-function handleCanvasClick(event) {
-  if (!game.handleCanvasClick || !world) return;
+function canvasPointFromEvent(event) {
   const rect = gameCanvas.getBoundingClientRect();
   const canvasWidth = gameCanvas.width || WIDTH;
   const canvasHeight = gameCanvas.height || HEIGHT;
-  const point = {
+  return {
     x: ((event.clientX - rect.left) / rect.width) * canvasWidth,
     y: ((event.clientY - rect.top) / rect.height) * canvasHeight,
   };
+}
+
+function handleCanvasClick(event) {
+  if (!game.handleCanvasClick || !world) return;
+  const point = canvasPointFromEvent(event);
   if (game.handleCanvasClick(point, world) && event.preventDefault) event.preventDefault();
+}
+
+function handleCanvasPointerMove(event) {
+  if (!game.handleCanvasPointerMove || !world) return;
+  game.handleCanvasPointerMove(canvasPointFromEvent(event), world);
+}
+
+function handleCanvasPointerLeave() {
+  if (!game.handleCanvasPointerLeave) return;
+  game.handleCanvasPointerLeave();
 }
 
 ui.toggleRun.addEventListener("click", () => {
@@ -3628,6 +3721,8 @@ ui.saveChampion.addEventListener("click", saveChampion);
 ui.loadChampion.addEventListener("click", loadChampion);
 ui.clearChampion.addEventListener("click", clearChampion);
 gameCanvas.addEventListener("click", handleCanvasClick);
+gameCanvas.addEventListener("pointermove", handleCanvasPointerMove);
+gameCanvas.addEventListener("pointerleave", handleCanvasPointerLeave);
 window.addEventListener("keydown", handleKeydown);
 window.addEventListener("keyup", handleKeyup);
 

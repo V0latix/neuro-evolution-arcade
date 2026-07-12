@@ -5,6 +5,7 @@ import { join } from "node:path";
 import { test } from "node:test";
 import { pathToFileURL } from "node:url";
 import { promisify } from "node:util";
+import { GRID as RAID_GRID, LAYOUTS as RAID_LAYOUTS } from "../src/village-raid-data.js";
 
 const root = new URL("../", import.meta.url);
 const pipeChampionStorageKey = "neuro-evolution-arcade.pipe-runner.champion";
@@ -82,6 +83,10 @@ class MockElement {
   getContext() {
     return this.context;
   }
+
+  getBoundingClientRect() {
+    return { left: 100, top: 50, width: 480, height: 270 };
+  }
 }
 
 class MockDocument {
@@ -147,6 +152,9 @@ function createMockContext() {
     setLineDash() {},
     createLinearGradient() {
       return { addColorStop() {} };
+    },
+    measureText(text) {
+      return { width: text.length * 7 };
     },
     fillText(text, x, y) {
       calls.push({ type: "fillText", text, x, y });
@@ -320,6 +328,7 @@ test("static app includes every primary control and asset reference", async () =
     "raidLegendGoblin",
     "raidLegendWallBreaker",
     "raidBase",
+    "raidTime",
     "raidComposition",
     "raidInventory",
     "raidAverage",
@@ -350,13 +359,18 @@ test("static app includes every primary control and asset reference", async () =
   assert.match(readme, /2026-07-11/);
   assert.match(readme, /Barbarian[^\n]*12[^\n]*54[^\n]*1/);
   assert.match(readme, /th3-2026-07-11-v2/);
-  assert.match(readme, /th3-reference-layouts-v2/);
+  assert.match(readme, /th3-reference-layouts-v3/);
+  assert.match(readme, /180 s[\s\S]*0 s/);
+  assert.match(readme, /calibrated[\s\S]*#111[\s\S]*#26[\s\S]*#104/i);
+  assert.match(readme, /hover[\s\S]*click[\s\S]*building/i);
+  assert.match(html, /180[^\n]*0/);
+  assert.doesNotMatch(readme, /th3-reference-layouts-v2/);
   assert.match(readme, /farm-111[\s\S]*war-26[\s\S]*defence-104/);
   assert.match(readme, /\[farm-111\]\(https:\/\/clashofclans-layouts\.com\/fr\/plans\/th_3\/farm_111\.html\)/);
   assert.match(readme, /\[war-26\]\(https:\/\/clashofclans-layouts\.com\/fr\/plans\/th_3\/war_26\.html\)/);
   assert.match(readme, /\[defence-104\]\(https:\/\/clashofclans-layouts\.com\/fr\/plans\/th_3\/defence_104\.html\)/);
-  assert.match(readme, /orthogonal arcade reconstructions based on/i);
-  assert.match(html, /approximations arcade orthogonales basees sur/i);
+  assert.match(readme, /gameplay topology is calibrated[\s\S]*orthogonal arcade grid/i);
+  assert.match(html, /topologies de jeu calibrees[\s\S]*grille arcade[\s\S]*orthogonale/i);
   assert.match(readme, /22\s+buildings,\s+50 walls,\s+and 2 bombs/i);
   assert.match(readme, /procedural Canvas/i);
   assert.match(readme, /troop legend/i);
@@ -650,6 +664,8 @@ test("game picker switches to AI-only Village Raid with its profile and HUD", as
   const harness = await loadHarness();
 
   element(harness, "gameRaid").click();
+  assert.equal(element(harness, "speed").value, 30);
+  element(harness, "speed").value = 1;
   harness.runFrame();
 
   assert.equal(element(harness, "activeGameTitle").textContent, "Village Raid HDV 3");
@@ -658,7 +674,6 @@ test("game picker switches to AI-only Village Raid with its profile and HUD", as
   assert.equal(element(harness, "alive").textContent, "1/24");
   assert.equal(element(harness, "population").value, 24);
   assert.equal(element(harness, "mutation").value, "0.12");
-  assert.equal(element(harness, "speed").value, 30);
   assert.equal(element(harness, "speed").max, 100);
   assert.equal(element(harness, "raidPanel").hidden, false);
   assert.equal(element(harness, "raidTroopLegend").hidden, false);
@@ -667,9 +682,15 @@ test("game picker switches to AI-only Village Raid with its profile and HUD", as
   assert.equal(element(harness, "presetPanel").hidden, true);
   assert.equal(element(harness, "modeHuman").disabled, true);
   assert.equal(element(harness, "raidBase").textContent, "1/3");
+  assert.equal(element(harness, "raidTime").textContent, "180 s");
   assert.match(element(harness, "raidComposition").textContent, /Barbares/);
   assert.match(element(harness, "raidInventory").textContent, /Barbares/);
   assert.equal(element(harness, "raidAverage").textContent, "0.00%");
+  assert.ok(
+    element(harness, "game").getContext().calls.some(
+      (call) => call.type === "fillText" && call.text === "Temps 180 s",
+    ),
+  );
 
   const html = await readFile(new URL("../index.html", import.meta.url), "utf8");
   assert.match(html, /Cible : defenses/);
@@ -696,6 +717,12 @@ test("game picker switches to AI-only Village Raid with its profile and HUD", as
     Math.abs(raidOverlayLabels[0].y - raidOverlayLabels[1].y) >= 18,
     "raid destruction and average labels need separate readable lines",
   );
+
+  harness.runFrame(20);
+  assert.equal(element(harness, "raidTime").textContent, "179 s");
+  const raidTimeLabels = element(harness, "game").getContext().calls
+    .filter((call) => call.type === "fillText" && call.text.startsWith("Temps "));
+  assert.equal(raidTimeLabels.at(-1)?.text, "Temps 179 s");
 
   const troopKeyLabels = element(harness, "game").getContext().calls
     .filter((call) => call.type === "fillText")
@@ -725,6 +752,94 @@ test("game picker switches to AI-only Village Raid with its profile and HUD", as
   assert.equal(element(harness, "raidPanel").hidden, true);
 });
 
+test("Village Raid inspects living buildings on hover and click without permanent labels", async () => {
+  const harness = await loadHarness();
+  const canvas = element(harness, "game");
+  const context = canvas.getContext();
+  element(harness, "gameRaid").click();
+  element(harness, "toggleRun").click();
+  harness.runFrame();
+
+  const townHall = RAID_LAYOUTS[0].buildings.find(({ type }) => type === "townHall");
+  const tile = Math.min(960 / RAID_GRID.width, 560 / RAID_GRID.height);
+  const offsetX = (960 - RAID_GRID.width * tile) / 2;
+  const center = {
+    x: offsetX + (townHall.x + townHall.width / 2) * tile,
+    y: (townHall.y + townHall.height / 2) * tile,
+  };
+  const clientPoint = canvasClientPoint(canvas, center);
+
+  context.calls.length = 0;
+  canvas.dispatchEvent({ type: "pointermove", ...clientPoint });
+  harness.runFrame();
+  assert.deepEqual(raidInspectionLabels(context), [
+    "Hotel de ville", `Niv. ${townHall.level}`, `HP ${townHall.hp}/${townHall.hp}`,
+  ]);
+
+  context.calls.length = 0;
+  canvas.dispatchEvent({ type: "pointerleave" });
+  harness.runFrame();
+  assert.deepEqual(raidInspectionLabels(context), []);
+
+  canvas.dispatchEvent({ type: "click", ...clientPoint, preventDefault() {} });
+  const emptyClientPoint = canvasClientPoint(canvas, { x: 4, y: 530 });
+  canvas.dispatchEvent({ type: "pointermove", ...emptyClientPoint });
+  context.calls.length = 0;
+  harness.runFrame();
+  assert.deepEqual(raidInspectionLabels(context), [
+    "Hotel de ville", `Niv. ${townHall.level}`, `HP ${townHall.hp}/${townHall.hp}`,
+  ]);
+
+  canvas.dispatchEvent({ type: "click", ...emptyClientPoint, preventDefault() {} });
+  context.calls.length = 0;
+  harness.runFrame();
+  assert.deepEqual(raidInspectionLabels(context), []);
+
+  canvas.dispatchEvent({ type: "click", ...clientPoint, preventDefault() {} });
+  element(harness, "reset").click();
+  context.calls.length = 0;
+  harness.runFrame();
+  assert.deepEqual(raidInspectionLabels(context), [], "reset clears pinned inspection");
+
+  canvas.dispatchEvent({ type: "click", ...clientPoint, preventDefault() {} });
+  element(harness, "gamePipe").click();
+  element(harness, "gameRaid").click();
+  element(harness, "toggleRun").click();
+  context.calls.length = 0;
+  harness.runFrame();
+  assert.deepEqual(raidInspectionLabels(context), [], "game switching clears pinned inspection");
+
+  canvas.dispatchEvent({ type: "click", ...clientPoint, preventDefault() {} });
+  element(harness, "speed").value = 100;
+  element(harness, "toggleRun").click();
+  runUntil(harness, () => element(harness, "raidBase").textContent === "2/3", 50);
+  element(harness, "toggleRun").click();
+  context.calls.length = 0;
+  harness.runFrame();
+  assert.deepEqual(raidInspectionLabels(context), [], "base transition clears pinned inspection");
+});
+
+function canvasClientPoint(canvas, point) {
+  const rect = canvas.getBoundingClientRect();
+  return {
+    clientX: rect.left + point.x / 960 * rect.width,
+    clientY: rect.top + point.y / 560 * rect.height,
+  };
+}
+
+function raidInspectionLabels(context) {
+  return context.calls
+    .filter(({ type, text }) => type === "fillText" &&
+      (/^(Niv\. |HP )/.test(text) || text === "Hotel de ville"))
+    .map(({ text }) => text);
+}
+
+function lastRaidTimeLabel(context) {
+  return context.calls
+    .filter(({ type, text }) => type === "fillText" && text.startsWith("Temps "))
+    .at(-1)?.text;
+}
+
 test("Village Raid champions carry and enforce the profile, dataset, and layout versions", async () => {
   const harness = await loadHarness();
   element(harness, "gameRaid").click();
@@ -737,7 +852,7 @@ test("Village Raid champions carry and enforce the profile, dataset, and layout 
   assert.equal(saved.hidden, 18);
   assert.equal(saved.outputs, 7);
   assert.equal(saved.datasetVersion, "th3-2026-07-11-v2");
-  assert.equal(saved.layoutVersion, "th3-reference-layouts-v2");
+  assert.equal(saved.layoutVersion, "th3-reference-layouts-v3");
   assert.equal(saved.genome.length, 817);
 
   for (const incompatible of [
@@ -770,7 +885,7 @@ test("Village Raid converts saturated output probabilities into a specialized ar
     hidden: 18,
     outputs: 7,
     datasetVersion: "th3-2026-07-11-v2",
-    layoutVersion: "th3-reference-layouts-v2",
+    layoutVersion: "th3-reference-layouts-v3",
   }));
   element(harness, "loadChampion").click();
   harness.runFrame();
@@ -794,7 +909,7 @@ test("Village Raid evaluates the three bases before advancing to the next specim
     hidden: 18,
     outputs: 7,
     datasetVersion: "th3-2026-07-11-v2",
-    layoutVersion: "th3-reference-layouts-v2",
+    layoutVersion: "th3-reference-layouts-v3",
   }));
   element(harness, "loadChampion").click();
   harness.runFrame();
@@ -802,20 +917,141 @@ test("Village Raid evaluates the three bases before advancing to the next specim
   const composition = element(harness, "raidComposition").textContent;
   const firstInventory = element(harness, "raidInventory").textContent;
 
-  harness.runFrame(35);
+  runUntil(harness, () => element(harness, "raidBase").textContent === "2/3", 40);
   assert.equal(element(harness, "alive").textContent, "1/24");
   assert.equal(element(harness, "raidBase").textContent, "2/3");
   assert.equal(element(harness, "raidComposition").textContent, composition);
   assert.equal(element(harness, "raidInventory").textContent, firstInventory);
-  harness.runFrame(36);
+  runUntil(harness, () => element(harness, "raidBase").textContent === "3/3", 40);
   assert.equal(element(harness, "alive").textContent, "1/24");
   assert.equal(element(harness, "raidBase").textContent, "3/3");
   assert.equal(element(harness, "raidComposition").textContent, composition);
   assert.equal(element(harness, "raidInventory").textContent, firstInventory);
-  harness.runFrame(36);
+  runUntil(harness, () => element(harness, "alive").textContent === "2/24", 40);
   assert.equal(element(harness, "alive").textContent, "2/24");
   assert.equal(element(harness, "raidBase").textContent, "1/3");
   assert.equal(element(harness, "bestScore").textContent, "0.00%");
+});
+
+test("Village Raid renders timeout zero before resetting the next base at high speed", async () => {
+  const harness = await loadHarness();
+  const context = element(harness, "game").getContext();
+  element(harness, "gameRaid").click();
+  element(harness, "speed").value = 30;
+  harness.storage.setItem(raidChampionStorageKey, JSON.stringify({
+    game: "raid",
+    genome: Array.from({ length: 817 }, () => 0),
+    inputs: 37,
+    hidden: 18,
+    outputs: 7,
+    datasetVersion: "th3-2026-07-11-v2",
+    layoutVersion: "th3-reference-layouts-v3",
+  }));
+  element(harness, "loadChampion").click();
+
+  context.calls.length = 0;
+  runUntil(harness, () => element(harness, "raidTime").textContent === "0 s", 125);
+  assert.equal(element(harness, "raidBase").textContent, "1/3");
+  assert.equal(
+    lastRaidTimeLabel(context),
+    "Temps 0 s",
+  );
+
+  context.calls.length = 0;
+  harness.runFrame();
+  assert.equal(element(harness, "raidBase").textContent, "2/3");
+  assert.equal(element(harness, "raidTime").textContent, "180 s");
+  assert.equal(lastRaidTimeLabel(context), "Temps 180 s");
+});
+
+test("Village Raid renders 180 before accelerating its initial base", async () => {
+  const harness = await loadHarness();
+  const context = element(harness, "game").getContext();
+  element(harness, "gameRaid").click();
+  assert.equal(element(harness, "speed").value, 30);
+
+  context.calls.length = 0;
+  harness.runFrame();
+  assert.equal(element(harness, "raidTime").textContent, "180 s");
+  assert.equal(lastRaidTimeLabel(context), "Temps 180 s");
+
+  context.calls.length = 0;
+  harness.runFrame();
+  assert.equal(element(harness, "raidTime").textContent, "179 s");
+  assert.equal(lastRaidTimeLabel(context), "Temps 179 s");
+});
+
+test("Village Raid renders 180 before accelerating after Reset", async () => {
+  const harness = await loadHarness();
+  const context = element(harness, "game").getContext();
+  element(harness, "gameRaid").click();
+  harness.runFrame();
+
+  element(harness, "reset").click();
+  context.calls.length = 0;
+  harness.runFrame();
+  assert.equal(element(harness, "raidTime").textContent, "180 s");
+  assert.equal(lastRaidTimeLabel(context), "Temps 180 s");
+
+  context.calls.length = 0;
+  harness.runFrame();
+  assert.equal(element(harness, "raidTime").textContent, "179 s");
+  assert.equal(lastRaidTimeLabel(context), "Temps 179 s");
+});
+
+test("Village Raid renders 180 before accelerating a new generation", async () => {
+  const harness = await loadHarness();
+  const context = element(harness, "game").getContext();
+  element(harness, "gameRaid").click();
+  element(harness, "population").value = 1;
+  harness.storage.setItem(raidChampionStorageKey, JSON.stringify({
+    game: "raid",
+    genome: Array.from({ length: 817 }, () => 0),
+    inputs: 37,
+    hidden: 18,
+    outputs: 7,
+    datasetVersion: "th3-2026-07-11-v2",
+    layoutVersion: "th3-reference-layouts-v3",
+  }));
+  element(harness, "loadChampion").click();
+
+  context.calls.length = 0;
+  runUntil(harness, () => element(harness, "generation").textContent === 2, 370);
+  assert.equal(element(harness, "raidBase").textContent, "1/3");
+  assert.equal(element(harness, "raidTime").textContent, "180 s");
+  assert.equal(lastRaidTimeLabel(context), "Temps 180 s");
+
+  context.calls.length = 0;
+  harness.runFrame();
+  assert.equal(element(harness, "raidTime").textContent, "179 s");
+  assert.equal(lastRaidTimeLabel(context), "Temps 179 s");
+});
+
+test("Village Raid renders 180 for exactly one frame between specimens", async () => {
+  const harness = await loadHarness();
+  const context = element(harness, "game").getContext();
+  element(harness, "gameRaid").click();
+  harness.storage.setItem(raidChampionStorageKey, JSON.stringify({
+    game: "raid",
+    genome: Array.from({ length: 817 }, () => 0),
+    inputs: 37,
+    hidden: 18,
+    outputs: 7,
+    datasetVersion: "th3-2026-07-11-v2",
+    layoutVersion: "th3-reference-layouts-v3",
+  }));
+  element(harness, "loadChampion").click();
+
+  context.calls.length = 0;
+  runUntil(harness, () => element(harness, "alive").textContent === "2/24", 370);
+  assert.equal(element(harness, "raidBase").textContent, "1/3");
+  assert.equal(element(harness, "raidTime").textContent, "180 s");
+  assert.equal(lastRaidTimeLabel(context), "Temps 180 s");
+
+  context.calls.length = 0;
+  harness.runFrame();
+  assert.equal(element(harness, "raidTime").textContent, "179 s");
+  assert.equal(lastRaidTimeLabel(context), "Temps 179 s");
 });
 
 test("Village Raid restores a depleted specialized army at each base transition", async () => {
@@ -835,7 +1071,7 @@ test("Village Raid restores a depleted specialized army at each base transition"
     hidden: 18,
     outputs: 7,
     datasetVersion: "th3-2026-07-11-v2",
-    layoutVersion: "th3-reference-layouts-v2",
+    layoutVersion: "th3-reference-layouts-v3",
   }));
   element(harness, "loadChampion").click();
   harness.runFrame(3);
@@ -845,11 +1081,13 @@ test("Village Raid restores a depleted specialized army at each base transition"
   assert.match(element(harness, "raidInventory").textContent, /^Barbares 69\b/);
 
   runUntil(harness, () => element(harness, "raidBase").textContent === "2/3", 3601);
+  assert.equal(element(harness, "raidTime").textContent, "180 s");
   assert.equal(element(harness, "raidInventory").textContent, fullArmy);
   harness.runFrame(3);
   assert.match(element(harness, "raidInventory").textContent, /^Barbares 69\b/);
 
   runUntil(harness, () => element(harness, "raidBase").textContent === "3/3", 3601);
+  assert.equal(element(harness, "raidTime").textContent, "180 s");
   assert.equal(element(harness, "raidInventory").textContent, fullArmy);
 });
 

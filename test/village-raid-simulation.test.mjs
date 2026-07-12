@@ -2,6 +2,8 @@ import test from "node:test";
 import assert from "node:assert/strict";
 
 import {
+  RAID_MAX_TICKS,
+  RAID_TICKS_PER_SECOND,
   chooseAvailableTroop,
   createRaidWorld,
   deployTroop,
@@ -9,6 +11,7 @@ import {
   findRaidPath,
   getRaidObservation,
   isRaidComplete,
+  raidSecondsRemaining,
   stepRaid,
 } from "../src/village-raid-simulation.js";
 
@@ -29,6 +32,21 @@ function run(world, ticks, action) {
   }
   return world;
 }
+
+test("raid countdown converts simulation ticks into 180-to-0 seconds", () => {
+  const world = createRaidWorld("farm-111", MIXED);
+  assert.equal(raidSecondsRemaining(world), 180);
+  world.tick = 1;
+  assert.equal(raidSecondsRemaining(world), 180);
+  world.tick = RAID_TICKS_PER_SECOND;
+  assert.equal(raidSecondsRemaining(world), 179);
+  world.tick = RAID_MAX_TICKS - 1;
+  assert.equal(raidSecondsRemaining(world), 1);
+  world.tick = RAID_MAX_TICKS;
+  assert.equal(raidSecondsRemaining(world), 0);
+  world.tick = RAID_MAX_TICKS + 50;
+  assert.equal(raidSecondsRemaining(world), 0);
+});
 
 test("creates an isolated world and a normalized 37-value observation", () => {
   const first = createRaidWorld("farm-111", MIXED);

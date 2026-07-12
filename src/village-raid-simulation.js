@@ -78,6 +78,11 @@ export function createRaidWorld(layoutId = 0, composition = {}) {
   };
 }
 
+export function raidSecondsRemaining(world) {
+  const ticks = Math.max(0, world.maxTicks - world.tick);
+  return Math.ceil(ticks / RAID_TICKS_PER_SECOND);
+}
+
 export function getRaidObservation(world) {
   const observation = [
     clamp01(world.phase),
