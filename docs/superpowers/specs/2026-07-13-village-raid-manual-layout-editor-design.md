@@ -203,4 +203,3 @@ until the user approves the exported coordinates.
 4. Only after all three exports are explicitly approved, replace production
    layout coordinates, increment the layout compatibility version, finish the
    isometric renderer integration, and run the complete game regression suite.
-
