@@ -72,10 +72,16 @@ export function createLayoutEditorState(layout, calibration) {
 }
 
 export function moveLayoutEditorEntity(state, selection, cell) {
+  if (selection.kind !== "building" && selection.kind !== "trap") {
+    return { state, error: `Type d'element inconnu: ${selection.kind}` };
+  }
   const collectionName = selection.kind === "building" ? "buildings" : "traps";
   const collection = state[collectionName];
   const index = collection.findIndex(({ id }) => id === selection.id);
   if (index < 0) return { state, error: `Element inconnu: ${selection.id}` };
+  if (collection[index].x === cell.x && collection[index].y === cell.y) {
+    return { state, error: null };
+  }
   const candidate = { ...collection[index], x: cell.x, y: cell.y };
   const error = candidatePlacementError(state, candidate, selection);
   if (error) return { state, error };
@@ -141,6 +147,7 @@ export function applyLayoutEditorWallStroke(state, mode, cells) {
   if (mode !== "paint") return { state, error: "Outil de mur inconnu" };
   const existing = new Set(state.walls.map(({ x, y }) => cellKey(x, y)));
   const additions = unique.filter(({ x, y }) => !existing.has(cellKey(x, y)));
+  if (!additions.length) return { state, error: null };
   if (additions.length > layoutEditorWallReserve(state)) {
     return { state, error: "Reserve de murs insuffisante" };
   }

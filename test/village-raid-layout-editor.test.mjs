@@ -115,3 +115,117 @@ test("history groups one edit and supports undo redo and reset", () => {
   history = resetLayoutEditorHistory(history);
   assert.deepEqual(history.present, initial);
 });
+
+test("moving an entity to its current cell is a no-op without phantom history", () => {
+  const state = createLayoutEditorState(farm, defaultCalibration);
+  const hut = state.buildings.find(({ id }) => id === "builderHut-1");
+  const unchanged = moveLayoutEditorEntity(
+    state,
+    { kind: "building", id: hut.id },
+    { x: hut.x, y: hut.y },
+  );
+  assert.equal(unchanged.error, null);
+  assert.equal(unchanged.state, state);
+
+  const history = createLayoutEditorHistory(state);
+  assert.equal(commitLayoutEditorHistory(history, unchanged.state), history);
+  assert.deepEqual(history.past, []);
+});
+
+test("painting only existing walls preserves the state reference", () => {
+  const state = createLayoutEditorState(farm, defaultCalibration);
+  const existingCell = { x: state.walls[0].x, y: state.walls[0].y };
+  const unchanged = applyLayoutEditorWallStroke(
+    state,
+    "paint",
+    [existingCell, existingCell],
+  );
+  assert.equal(unchanged.error, null);
+  assert.equal(unchanged.state, state);
+});
+
+test("an unknown entity selection kind fails atomically", () => {
+  const state = createLayoutEditorState(farm, defaultCalibration);
+  const result = moveLayoutEditorEntity(
+    state,
+    { kind: "decoration", id: state.traps[0].id },
+    { x: 1, y: 1 },
+  );
+  assert.match(result.error, /inconnu/i);
+  assert.equal(result.state, state);
+});
+
+test("building trap and wall edits reject off-grid cells atomically", () => {
+  const state = createLayoutEditorState(farm, defaultCalibration);
+  const building = moveLayoutEditorEntity(
+    state,
+    { kind: "building", id: "builderHut-1" },
+    { x: 47, y: 31 },
+  );
+  assert.match(building.error, /terrain/i);
+  assert.equal(building.state, state);
+
+  const trap = moveLayoutEditorEntity(
+    state,
+    { kind: "trap", id: state.traps[0].id },
+    { x: -1, y: 0 },
+  );
+  assert.match(trap.error, /terrain/i);
+  assert.equal(trap.state, state);
+
+  const removedCell = { x: state.walls[0].x, y: state.walls[0].y };
+  const erased = applyLayoutEditorWallStroke(state, "erase", [removedCell]).state;
+  const wall = applyLayoutEditorWallStroke(erased, "paint", [{ x: 48, y: 0 }]);
+  assert.match(wall.error, /terrain/i);
+  assert.equal(wall.state, erased);
+});
+
+test("painting a wall on an entity fails atomically", () => {
+  const state = createLayoutEditorState(farm, defaultCalibration);
+  const removedCell = { x: state.walls[0].x, y: state.walls[0].y };
+  const erased = applyLayoutEditorWallStroke(state, "erase", [removedCell]).state;
+  const townHall = erased.buildings.find(({ id }) => id === "townHall-1");
+  const blocked = applyLayoutEditorWallStroke(
+    erased,
+    "paint",
+    [{ x: townHall.x, y: townHall.y }],
+  );
+  assert.match(blocked.error, /occupee/i);
+  assert.equal(blocked.state, erased);
+});
+
+test("a new commit invalidates redo without mutating history arrays", () => {
+  const initial = createLayoutEditorState(farm, defaultCalibration);
+  const firstMove = moveLayoutEditorEntity(
+    initial,
+    { kind: "building", id: "builderHut-1" },
+    { x: 1, y: 1 },
+  ).state;
+  const original = createLayoutEditorHistory(initial);
+  Object.freeze(original.past);
+  Object.freeze(original.future);
+
+  const committed = commitLayoutEditorHistory(original, firstMove);
+  assert.deepEqual(original.past, []);
+  assert.deepEqual(original.future, []);
+  Object.freeze(committed.past);
+  Object.freeze(committed.future);
+
+  const undone = undoLayoutEditorHistory(committed);
+  assert.equal(committed.present, firstMove);
+  assert.deepEqual(committed.future, []);
+  assert.deepEqual(undone.future, [firstMove]);
+  Object.freeze(undone.past);
+  Object.freeze(undone.future);
+
+  const secondMove = moveLayoutEditorEntity(
+    undone.present,
+    { kind: "building", id: "builderHut-1" },
+    { x: 2, y: 2 },
+  ).state;
+  const recommitted = commitLayoutEditorHistory(undone, secondMove);
+  assert.deepEqual(recommitted.future, []);
+  assert.deepEqual(undone.future, [firstMove]);
+  assert.notEqual(recommitted.past, undone.past);
+  assert.notEqual(recommitted.future, undone.future);
+});
