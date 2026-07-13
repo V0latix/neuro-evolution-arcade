@@ -74,3 +74,41 @@ test("manual layout editor styling exposes responsive focus and disabled states"
   assert.match(css, /button\[aria-pressed="true"\]/);
   assert.doesNotMatch(css, /@import|url\s*\(/i);
 });
+
+test("editor rerenders restore focus to the replaced base tool or entity button", async () => {
+  const script = await readFile(scriptUrl, "utf8");
+  assert.match(script, /function captureEditorFocus\(/);
+  assert.match(script, /function restoreEditorFocus\(/);
+  assert.match(script, /const focusTarget = captureEditorFocus\(\)/);
+  assert.match(script, /restoreEditorFocus\(focusTarget\)/);
+  assert.match(script, /dataset\.entityKind/);
+  assert.match(script, /dataset\.entityId/);
+});
+
+test("validation derives actionable entity and cell highlights for both canvases", async () => {
+  const script = await readFile(scriptUrl, "utf8");
+  assert.match(script, /function createValidationHighlights\(state, result\)/);
+  assert.match(script, /missingBuildingIds/);
+  assert.match(script, /missingTrapIds/);
+  assert.match(script, /overlap/);
+  assert.match(script, /offGrid/);
+  assert.match(script, /disconnectedWallCells/);
+  assert.match(script, /drawSourceValidationHighlights\(context, state, drawRect/);
+  assert.match(script, /drawIsoValidationHighlights\(context, geometry/);
+  assert.match(script, /validationFeedback\.highlights/);
+});
+
+test("pointer cancellation releases capture on its owner before clearing state", async () => {
+  const script = await readFile(scriptUrl, "utf8");
+  assert.match(script, /let activePointerOwner = null/);
+  assert.match(script, /function cancelPointerInteraction\(\)/);
+  assert.match(script, /activePointerOwner\.hasPointerCapture\(activePointerId\)/);
+  assert.match(script, /activePointerOwner\.releasePointerCapture\(activePointerId\)/);
+  const cancelFunction = script.match(
+    /function cancelPointerInteraction\(\) \{(?<body>[\s\S]*?)\n\}/,
+  )?.groups?.body ?? "";
+  assert.ok(
+    cancelFunction.indexOf("releasePointerCapture") < cancelFunction.indexOf("activePointerId = null"),
+    "capture must be released before pointer state is cleared",
+  );
+});

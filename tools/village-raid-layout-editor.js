@@ -113,6 +113,7 @@ let selectedTool = "align";
 let selectedEntity = null;
 let preview = null;
 let activePointerId = null;
+let activePointerOwner = null;
 let validationFeedback = null;
 
 function currentHistory() {
@@ -120,6 +121,7 @@ function currentHistory() {
 }
 
 function render() {
+  const focusTarget = captureEditorFocus();
   const state = currentHistory().present;
   const geometry = createRaidIsoGeometry(960, 560, LAYOUT_EDITOR_GRID);
   renderToolbar(state);
@@ -129,6 +131,32 @@ function render() {
   // Both renderers deliberately receive the exact same canonical state object.
   renderSourceCanvas(state, preview);
   renderIsoCanvas(state, preview, geometry);
+  restoreEditorFocus(focusTarget);
+}
+
+function captureEditorFocus() {
+  const active = document.activeElement;
+  if (elements.baseTabs.contains(active)) return { group: "base", id: active.dataset.baseId };
+  if (elements.toolButtons.contains(active)) return { group: "tool", id: active.dataset.tool };
+  if (elements.entityList.contains(active)) {
+    return { group: "entity", kind: active.dataset.entityKind, id: active.dataset.entityId };
+  }
+  return null;
+}
+
+function restoreEditorFocus(target) {
+  if (!target) return;
+  const container = {
+    base: elements.baseTabs,
+    tool: elements.toolButtons,
+    entity: elements.entityList,
+  }[target.group];
+  const button = [...container.querySelectorAll("button")].find((candidate) => {
+    if (target.group === "base") return candidate.dataset.baseId === target.id;
+    if (target.group === "tool") return candidate.dataset.tool === target.id;
+    return candidate.dataset.entityKind === target.kind && candidate.dataset.entityId === target.id;
+  });
+  button?.focus({ preventScroll: true });
 }
 
 function renderToolbar(state) {
@@ -151,7 +179,7 @@ function renderToolbar(state) {
     button.setAttribute("aria-pressed", String(tool.id === selectedTool));
     button.disabled = tool.id === "paint" && reserve === 0;
     button.addEventListener("click", () => {
-      cancelPointerPreview();
+      cancelPointerInteraction();
       selectedTool = tool.id;
       validationFeedback = null;
       invalidateExport();
@@ -188,9 +216,19 @@ function renderEntityList(state, selection) {
     for (const entity of entities) {
       const button = document.createElement("button");
       button.type = "button";
+      button.dataset.entityKind = kind;
+      button.dataset.entityId = entity.id;
       button.setAttribute("aria-pressed", String(
         selection?.kind === kind && selection.id === entity.id,
       ));
+      button.classList.toggle(
+        "is-invalid",
+        Boolean(validationFeedback?.highlights.errorIds.has(entity.id)),
+      );
+      button.classList.toggle(
+        "is-warning",
+        Boolean(validationFeedback?.highlights.warningIds.has(entity.id)),
+      );
       const name = ENTITY_TYPE_LABELS[entity.type] ?? "Element";
       const label = document.createElement("span");
       label.textContent = name;
@@ -253,6 +291,7 @@ function renderSourceCanvas(state, activePreview) {
 
   drawSourceGrid(context, state.calibration, drawRect);
   drawSourceEntities(context, state, drawRect, activePreview);
+  drawSourceValidationHighlights(context, state, drawRect);
 }
 
 function renderIsoCanvas(state, activePreview, geometry) {
@@ -281,6 +320,7 @@ function renderIsoCanvas(state, activePreview, geometry) {
       "#5eead4",
     );
   }
+  drawIsoValidationHighlights(context, geometry);
 }
 
 function drawSourceGrid(context, calibration, drawRect) {
@@ -386,6 +426,151 @@ function stateEntities(state) {
   ];
 }
 
+function createValidationHighlights(state, result) {
+  const errorIds = new Set();
+  const errorCells = new Set();
+  const warningIds = new Set();
+  const warningCells = new Set();
+  const buildingIds = new Set(state.buildings.map(({ id }) => id));
+  const trapIds = new Set(state.traps.map(({ id }) => id));
+  const missingBuildingIds = state.requiredBuildingIds.filter((id) => !buildingIds.has(id));
+  const missingTrapIds = state.requiredTrapIds.filter((id) => !trapIds.has(id));
+  const unexpectedBuildingIds = [...buildingIds].filter(
+    (id) => !state.requiredBuildingIds.includes(id),
+  );
+  const unexpectedTrapIds = [...trapIds].filter((id) => !state.requiredTrapIds.includes(id));
+
+  if (result.errors.some((message) => /22 batiments/i.test(message))) {
+    addEntitiesToHighlights(state.buildings, errorIds, errorCells);
+    for (const id of missingBuildingIds) errorIds.add(id);
+  }
+  if (result.errors.some((message) => /50 murs/i.test(message))) {
+    addEntitiesToHighlights(state.walls, errorIds, errorCells);
+  }
+  if (result.errors.some((message) => /2 bombes/i.test(message))) {
+    addEntitiesToHighlights(state.traps, errorIds, errorCells);
+    for (const id of missingTrapIds) errorIds.add(id);
+  }
+  for (const id of [
+    ...missingBuildingIds,
+    ...missingTrapIds,
+    ...unexpectedBuildingIds,
+    ...unexpectedTrapIds,
+  ]) errorIds.add(id);
+  addEntitiesToHighlights(
+    state.buildings.filter(({ id }) => unexpectedBuildingIds.includes(id)),
+    errorIds,
+    errorCells,
+  );
+  addEntitiesToHighlights(
+    state.traps.filter(({ id }) => unexpectedTrapIds.includes(id)),
+    errorIds,
+    errorCells,
+  );
+
+  const occupied = new Map();
+  const overlap = new Set();
+  const offGrid = new Set();
+  for (const [, entities] of stateEntities(state)) {
+    for (const entity of entities) {
+      for (const cell of entityFootprintCells(entity)) {
+        const key = cellKey(cell);
+        if (!insideEditorGrid(cell)) {
+          offGrid.add(key);
+          errorIds.add(entity.id);
+          errorCells.add(key);
+        }
+        const previousId = occupied.get(key);
+        if (previousId) {
+          overlap.add(key);
+          errorIds.add(previousId);
+          errorIds.add(entity.id);
+          errorCells.add(key);
+        } else {
+          occupied.set(key, entity.id);
+        }
+      }
+    }
+  }
+
+  const components = wallComponents(state.walls).sort((left, right) => right.length - left.length);
+  const disconnectedWallCells = result.warnings.some((message) => /deconnect/i.test(message))
+    ? components.slice(1).flat()
+    : [];
+  for (const wall of disconnectedWallCells) {
+    warningIds.add(wall.id);
+    warningCells.add(cellKey(wall));
+  }
+  return {
+    errorIds,
+    errorCells,
+    warningIds,
+    warningCells,
+    missingBuildingIds,
+    missingTrapIds,
+    overlap,
+    offGrid,
+    disconnectedWallCells,
+  };
+}
+
+function addEntitiesToHighlights(entities, ids, cells) {
+  for (const entity of entities) {
+    ids.add(entity.id);
+    for (const cell of entityFootprintCells(entity)) cells.add(cellKey(cell));
+  }
+}
+
+function entityFootprintCells(entity) {
+  const width = entity.width ?? 1;
+  const height = entity.height ?? 1;
+  return Array.from({ length: width * height }, (_, index) => ({
+    x: entity.x + index % width,
+    y: entity.y + Math.floor(index / width),
+  }));
+}
+
+function insideEditorGrid({ x, y }) {
+  return Number.isInteger(x) && Number.isInteger(y) && x >= 0 && y >= 0 &&
+    x < LAYOUT_EDITOR_GRID.width && y < LAYOUT_EDITOR_GRID.height;
+}
+
+function cellKey({ x, y }) {
+  return `${x},${y}`;
+}
+
+function parseCellKey(key) {
+  const [x, y] = key.split(",").map(Number);
+  return { x, y };
+}
+
+function wallComponents(walls) {
+  const byCell = new Map(walls.map((wall) => [cellKey(wall), wall]));
+  const remaining = new Set(byCell.keys());
+  const components = [];
+  while (remaining.size) {
+    const first = remaining.values().next().value;
+    const queue = [first];
+    const component = [];
+    remaining.delete(first);
+    while (queue.length) {
+      const key = queue.shift();
+      const wall = byCell.get(key);
+      component.push(wall);
+      for (const neighbor of [
+        { x: wall.x + 1, y: wall.y },
+        { x: wall.x - 1, y: wall.y },
+        { x: wall.x, y: wall.y + 1 },
+        { x: wall.x, y: wall.y - 1 },
+      ].map(cellKey)) {
+        if (remaining.delete(neighbor)) queue.push(neighbor);
+      }
+    }
+    components.push(component);
+  }
+  return components;
+}
+
 function normalizedEntity(entity) {
   return { ...entity, width: entity.width ?? 1, height: entity.height ?? 1 };
 }
@@ -397,9 +582,37 @@ function entityFill(kind) {
 }
 
 function entityStroke(kind, id) {
-  if (validationFeedback?.ids?.has(id)) return "#fb7185";
+  if (validationFeedback?.highlights.errorIds.has(id)) return "#fb7185";
+  if (validationFeedback?.highlights.warningIds.has(id)) return "#facc15";
   if (selectedEntity?.kind === kind && selectedEntity.id === id) return "#facc15";
   return kind === "building" ? "#99f6e4" : "#e2e8f0";
+}
+
+function drawSourceValidationHighlights(context, state, drawRect) {
+  const highlights = validationFeedback ? validationFeedback.highlights : null;
+  if (!highlights) return;
+  const projectCell = ({ x, y }) => [
+    { x, y }, { x: x + 1, y }, { x: x + 1, y: y + 1 }, { x, y: y + 1 },
+  ].map((point) => sourcePoint(state.calibration, drawRect, point));
+  drawCellHighlights(context, highlights.warningCells, projectCell, "#facc15");
+  drawCellHighlights(context, highlights.errorCells, projectCell, "#fb7185");
+}
+
+function drawIsoValidationHighlights(context, geometry) {
+  const highlights = validationFeedback ? validationFeedback.highlights : null;
+  if (!highlights) return;
+  const projectCell = (cell) => projectRaidFootprint(
+    geometry,
+    { ...cell, width: 1, height: 1 },
+  );
+  drawCellHighlights(context, highlights.warningCells, projectCell, "#facc15");
+  drawCellHighlights(context, highlights.errorCells, projectCell, "#fb7185");
+}
+
+function drawCellHighlights(context, cells, projectCell, color) {
+  for (const key of cells) {
+    drawPolygon(context, projectCell(parseCellKey(key)), "rgba(0, 0, 0, 0)", color);
+  }
 }
 
 function containRect(sourceWidth, sourceHeight, targetWidth, targetHeight) {
@@ -416,7 +629,7 @@ function containRect(sourceWidth, sourceHeight, targetWidth, targetHeight) {
 
 function selectBase(baseId) {
   if (baseId === selectedBaseId) return;
-  cancelPointerPreview();
+  cancelPointerInteraction();
   selectedBaseId = baseId;
   selectedEntity = null;
   validationFeedback = null;
@@ -477,15 +690,12 @@ elements.resetEditor.addEventListener("click", () => {
 elements.validateEditor.addEventListener("click", () => {
   const state = currentHistory().present;
   const result = validateLayoutEditorState(state);
-  const ids = new Set(result.errors.flatMap((message) =>
-    [...message.matchAll(/(?:^|\s)([a-zA-Z]+(?:-[a-zA-Z0-9]+)+)(?=\s|$)/g)]
-      .map((match) => match[1])
-  ));
+  const highlights = createValidationHighlights(state, result);
   if (!result.valid) {
     validationFeedback = {
       kind: "error",
-      ids,
-      message: `Validation bloquee : ${result.errors.join(" ; ")}`,
+      highlights,
+      message: `Validation bloquee : ${result.errors.join(" ; ")}. ${highlightSummary(highlights)}`,
     };
     invalidateExport();
     render();
@@ -495,13 +705,26 @@ elements.validateEditor.addEventListener("click", () => {
   elements.exportPanel.hidden = false;
   validationFeedback = {
     kind: result.warnings.length ? "warning" : "success",
-    ids,
+    highlights,
     message: result.warnings.length
-      ? `Village valide avec avertissement : ${result.warnings.join(" ; ")}`
+      ? `Village valide avec avertissement : ${result.warnings.join(" ; ")}. ${highlightSummary(highlights)}`
       : "Village valide. Les coordonnees affichees correspondent aux deux vues.",
   };
   render();
 });
+
+function highlightSummary(highlights) {
+  const ids = [...new Set([...highlights.errorIds, ...highlights.warningIds])];
+  const cells = [...new Set([...highlights.errorCells, ...highlights.warningCells])];
+  const summarize = (values) => {
+    const visible = values.slice(0, 8).join(", ");
+    return values.length > 8 ? `${visible} (+${values.length - 8})` : visible;
+  };
+  const parts = [];
+  if (ids.length) parts.push(`IDs : ${summarize(ids)}`);
+  if (cells.length) parts.push(`cases : ${summarize(cells)}`);
+  return parts.length ? `A verifier - ${parts.join(" ; ")}.` : "";
+}
 
 elements.sourceImage.addEventListener("change", () => {
   const [file] = elements.sourceImage.files;
@@ -576,7 +799,8 @@ function previewCellFromEvent(event) {
 function beginPointerPreview(event) {
   if (activePointerId !== null) return;
   activePointerId = event.pointerId;
-  event.currentTarget.setPointerCapture(event.pointerId);
+  activePointerOwner = event.currentTarget;
+  activePointerOwner.setPointerCapture(event.pointerId);
   preview = { cell: previewCellFromEvent(event) };
   render();
 }
@@ -589,12 +813,16 @@ function updatePointerPreview(event) {
 
 function endPointerPreview(event) {
   if (event.pointerId !== activePointerId) return;
-  cancelPointerPreview();
+  cancelPointerInteraction();
   render();
 }
 
-function cancelPointerPreview() {
+function cancelPointerInteraction() {
+  const ownsPointer = activePointerOwner !== null && activePointerId !== null &&
+    activePointerOwner.hasPointerCapture(activePointerId);
+  if (ownsPointer) activePointerOwner.releasePointerCapture(activePointerId);
   activePointerId = null;
+  activePointerOwner = null;
   preview = null;
 }
 
@@ -608,7 +836,7 @@ for (const canvas of [elements.sourceCanvas, elements.isoCanvas]) {
 
 window.addEventListener("keydown", (event) => {
   if (event.key === "Escape") {
-    cancelPointerPreview();
+    cancelPointerInteraction();
     render();
   }
 });

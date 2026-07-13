@@ -73,3 +73,33 @@ The only console entry was the static server's unrelated missing `favicon.ico`.
   keyboard coordinate movement, invalid drag previews, and completed-stroke
   history commits remain intentionally deferred to Task 5.
 - Browser QA for those editing interactions is likewise deferred to Task 5.
+
+## Review correction - focus, validation highlights, pointer capture
+
+### RED
+
+- Added three focused static regression tests before changing production code.
+- `node --test test/village-raid-layout-editor-ui.test.mjs`: 4 existing tests
+  passed and 3 new tests failed on the missing focus restoration, structured
+  validation highlights, and pointer-owner capture release.
+
+### GREEN
+
+- The render cycle now captures the stable base/tool/entity identity of the
+  focused button and restores focus to its replacement after rendering.
+- Validation derives error and warning IDs/cells without modifying the Task 3
+  model. Count, roster, overlap, off-grid, and disconnected-wall findings are
+  reflected in the entity list, live status, source canvas, and isometric canvas.
+- Pointer cancellation now records the owning canvas and calls
+  `releasePointerCapture` before clearing the pointer ID, owner, and preview.
+
+### Results
+
+- `node --test test/village-raid-layout-editor-ui.test.mjs`: 7 passed, 0 failed.
+- `node --check tools/village-raid-layout-editor.js`: passed.
+- `npm run check`: 137 passed, 0 failed.
+- `git diff --check`: passed.
+
+### Commit
+
+- Focused correction commit message: `fix: address Village Raid editor shell review`.
