@@ -199,10 +199,17 @@ export function validateLayoutEditorState(state) {
   if (reserves.walls > 0) errors.push(`${reserves.walls} murs restent en reserve`);
   if (reserves.traps) errors.push(`${reserves.traps} bombes restent en reserve`);
 
-  const entities = [...state.buildings, ...state.walls, ...state.traps];
+  const entities = [
+    ...state.buildings.map((entity) => ({ entity, reserveAllowed: true })),
+    ...state.walls.map((entity) => ({ entity, reserveAllowed: false })),
+    ...state.traps.map((entity) => ({ entity, reserveAllowed: true })),
+  ];
   const occupied = new Map();
-  for (const entity of entities) {
-    if (!hasValidCoordinatePair(entity)) {
+  for (const { entity, reserveAllowed } of entities) {
+    const coordinatesValid = reserveAllowed
+      ? hasValidCoordinatePair(entity)
+      : isLayoutEditorEntityPlaced(entity);
+    if (!coordinatesValid) {
       errors.push(`${entity.id ?? "Element"} a des coordonnees invalides`);
       continue;
     }

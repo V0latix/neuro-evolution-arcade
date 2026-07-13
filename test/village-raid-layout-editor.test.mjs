@@ -211,6 +211,23 @@ test("validation and export remain blocked until every reserve is empty", () => 
   assert.throws(() => serializeLayoutEditorExport(state), /reserve/i);
 });
 
+test("validation and export reject walls without integer coordinates", () => {
+  const state = {
+    ...createCompletedState(),
+    walls: Array.from({ length: 50 }, (_, index) => ({
+      id: `wall-${index + 1}`,
+      type: "wall",
+      level: 3,
+      x: null,
+      y: null,
+    })),
+  };
+  const result = validateLayoutEditorState(state);
+  assert.equal(result.valid, false);
+  assert.match(result.errors.join(" "), /coordonnees invalides/i);
+  assert.throws(() => serializeLayoutEditorExport(state), /coordonnees invalides/i);
+});
+
 test("a completed locked roster validates and reports disconnected walls separately", () => {
   const state = createCompletedState();
   assert.equal(validateLayoutEditorState(state).valid, true);
