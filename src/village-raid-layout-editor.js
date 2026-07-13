@@ -1,97 +1,92 @@
-export const LAYOUT_EDITOR_SCHEMA = "village-raid-layout-editor-v1";
+export const LAYOUT_EDITOR_SCHEMA = "village-raid-layout-editor-v2";
 export const LAYOUT_EDITOR_GRID = Object.freeze({ width: 48, height: 32 });
 export const LAYOUT_EDITOR_COUNTS = Object.freeze({ buildings: 22, walls: 50, traps: 2 });
 
-export function createScreenshotCalibration(
-  anchorPx,
-  columnHandlePx,
-  rowHandlePx,
-  anchorGrid,
-  axisCells = 5,
-) {
-  if (!Number.isFinite(axisCells) || axisCells <= 0) {
-    throw new RangeError("axisCells must be positive");
-  }
-  return {
-    anchorPx: clonePoint(anchorPx),
-    anchorGrid: clonePoint(anchorGrid),
-    columnBasis: {
-      x: (columnHandlePx.x - anchorPx.x) / axisCells,
-      y: (columnHandlePx.y - anchorPx.y) / axisCells,
-    },
-    rowBasis: {
-      x: (rowHandlePx.x - anchorPx.x) / axisCells,
-      y: (rowHandlePx.y - anchorPx.y) / axisCells,
-    },
-    axisCells,
-  };
-}
-
-export function projectEditorGridPoint(calibration, point) {
-  const columnDelta = point.x - calibration.anchorGrid.x;
-  const rowDelta = point.y - calibration.anchorGrid.y;
-  return roundPoint({
-    x: calibration.anchorPx.x + columnDelta * calibration.columnBasis.x +
-      rowDelta * calibration.rowBasis.x,
-    y: calibration.anchorPx.y + columnDelta * calibration.columnBasis.y +
-      rowDelta * calibration.rowBasis.y,
-  });
-}
-
-export function unprojectEditorScreenshotPoint(calibration, point) {
-  const determinant = calibration.columnBasis.x * calibration.rowBasis.y -
-    calibration.columnBasis.y * calibration.rowBasis.x;
-  if (Math.abs(determinant) < 1e-8) return null;
-  const dx = point.x - calibration.anchorPx.x;
-  const dy = point.y - calibration.anchorPx.y;
-  const columnDelta = (dx * calibration.rowBasis.y - dy * calibration.rowBasis.x) /
-    determinant;
-  const rowDelta = (dy * calibration.columnBasis.x - dx * calibration.columnBasis.y) /
-    determinant;
-  return roundPoint({
-    x: calibration.anchorGrid.x + columnDelta,
-    y: calibration.anchorGrid.y + rowDelta,
-  });
-}
-
-export function snapEditorGridPoint(point) {
-  return { x: Math.round(point.x), y: Math.round(point.y) };
-}
-
-export function createLayoutEditorState(layout, calibration) {
+export function createEmptyLayoutEditorState(layout) {
   return {
     schema: LAYOUT_EDITOR_SCHEMA,
     baseId: layout.id,
-    calibration: structuredClone(calibration),
     requiredBuildingIds: layout.buildings.map(({ id }) => id).sort(),
     requiredTrapIds: layout.traps.map(({ id }) => id).sort(),
-    buildings: layout.buildings.map((building) => ({ ...building })),
-    walls: layout.walls.map((wall) => ({ ...wall })),
-    traps: layout.traps.map((trap) => ({ ...trap })),
+    buildings: layout.buildings.map((building) => ({
+      ...building,
+      x: null,
+      y: null,
+    })),
+    walls: [],
+    traps: layout.traps.map((trap) => ({
+      ...trap,
+      x: null,
+      y: null,
+    })),
   };
 }
 
-export function moveLayoutEditorEntity(state, selection, cell) {
-  if (selection.kind !== "building" && selection.kind !== "trap") {
+export function isLayoutEditorEntityPlaced(entity) {
+  return Number.isInteger(entity.x) && Number.isInteger(entity.y);
+}
+
+export function layoutEditorReserveCounts(state) {
+  return {
+    buildings: state.buildings.filter((entity) => !isLayoutEditorEntityPlaced(entity)).length,
+    walls: LAYOUT_EDITOR_COUNTS.walls - state.walls.length,
+    traps: state.traps.filter((entity) => !isLayoutEditorEntityPlaced(entity)).length,
+  };
+}
+
+export function placeLayoutEditorEntity(state, selection, cell) {
+  const collectionName = entityCollectionName(selection.kind);
+  if (!collectionName) {
     return { state, error: `Type d'element inconnu: ${selection.kind}` };
   }
-  const collectionName = selection.kind === "building" ? "buildings" : "traps";
   const collection = state[collectionName];
   const index = collection.findIndex(({ id }) => id === selection.id);
   if (index < 0) return { state, error: `Element inconnu: ${selection.id}` };
-  if (collection[index].x === cell.x && collection[index].y === cell.y) {
+  if (collection[index].x === cell?.x && collection[index].y === cell?.y) {
     return { state, error: null };
   }
-  const candidate = { ...collection[index], x: cell.x, y: cell.y };
+  const candidate = { ...collection[index], x: cell?.x, y: cell?.y };
   const error = candidatePlacementError(state, candidate, selection);
   if (error) return { state, error };
-  const nextCollection = collection.map((entity, entityIndex) =>
-    entityIndex === index ? candidate : entity
-  );
-  return { state: { ...state, [collectionName]: nextCollection }, error: null };
+  return {
+    state: {
+      ...state,
+      [collectionName]: collection.map((entity, entityIndex) =>
+        entityIndex === index ? candidate : entity
+      ),
+    },
+    error: null,
+  };
+}
+
+export function removeLayoutEditorEntity(state, selection) {
+  const collectionName = entityCollectionName(selection.kind);
+  if (!collectionName) {
+    return { state, error: `Type d'element inconnu: ${selection.kind}` };
+  }
+  const collection = state[collectionName];
+  const index = collection.findIndex(({ id }) => id === selection.id);
+  if (index < 0) return { state, error: `Element inconnu: ${selection.id}` };
+  if (!isLayoutEditorEntityPlaced(collection[index])) return { state, error: null };
+  return {
+    state: {
+      ...state,
+      [collectionName]: collection.map((entity, entityIndex) => entityIndex === index
+        ? { ...entity, x: null, y: null }
+        : entity),
+    },
+    error: null,
+  };
+}
+
+function entityCollectionName(kind) {
+  if (kind === "building") return "buildings";
+  if (kind === "trap") return "traps";
+  return null;
 }
 
 function candidatePlacementError(state, candidate, selection) {
+  if (!isLayoutEditorEntityPlaced(candidate)) return "Element hors du terrain";
   const candidateCells = entityCells(candidate);
   if (candidateCells.some(({ x, y }) => !insideGrid(x, y))) return "Element hors du terrain";
   const occupied = occupiedCells(state, selection);
@@ -102,6 +97,7 @@ function candidatePlacementError(state, candidate, selection) {
 }
 
 function entityCells(entity) {
+  if (!isLayoutEditorEntityPlaced(entity)) return [];
   const width = entity.width ?? 1;
   const height = entity.height ?? 1;
   return Array.from({ length: width * height }, (_, index) => ({
@@ -160,7 +156,7 @@ export function applyLayoutEditorWallStroke(state, mode, cells) {
     ...additions.map(({ x, y }) => ({
       id: "wall-editor",
       type: "wall",
-      level: state.walls[0]?.level ?? 3,
+      level: 3,
       x,
       y,
     })),
@@ -180,12 +176,13 @@ export function validateLayoutEditorState(state) {
   if (state.buildings.length !== LAYOUT_EDITOR_COUNTS.buildings) {
     errors.push("Le village doit contenir 22 batiments");
   }
-  if (state.walls.length !== LAYOUT_EDITOR_COUNTS.walls) {
-    errors.push("Le village doit contenir 50 murs places");
+  if (state.walls.length > LAYOUT_EDITOR_COUNTS.walls) {
+    errors.push("Le village ne peut pas contenir plus de 50 murs");
   }
   if (state.traps.length !== LAYOUT_EDITOR_COUNTS.traps) {
     errors.push("Le village doit contenir 2 bombes");
   }
+
   const buildingIds = state.buildings.map(({ id }) => id).sort();
   const trapIds = state.traps.map(({ id }) => id).sort();
   if (JSON.stringify(buildingIds) !== JSON.stringify(state.requiredBuildingIds)) {
@@ -194,9 +191,21 @@ export function validateLayoutEditorState(state) {
   if (JSON.stringify(trapIds) !== JSON.stringify(state.requiredTrapIds)) {
     errors.push("Les identifiants de bombe doivent correspondre au roster verrouille");
   }
+
+  const reserves = layoutEditorReserveCounts(state);
+  if (reserves.buildings) {
+    errors.push(`${reserves.buildings} batiments restent en reserve`);
+  }
+  if (reserves.walls > 0) errors.push(`${reserves.walls} murs restent en reserve`);
+  if (reserves.traps) errors.push(`${reserves.traps} bombes restent en reserve`);
+
   const entities = [...state.buildings, ...state.walls, ...state.traps];
   const occupied = new Map();
   for (const entity of entities) {
+    if (!hasValidCoordinatePair(entity)) {
+      errors.push(`${entity.id ?? "Element"} a des coordonnees invalides`);
+      continue;
+    }
     for (const { x, y } of entityCells(entity)) {
       if (!insideGrid(x, y)) errors.push(`${entity.id} est hors du terrain`);
       const key = cellKey(x, y);
@@ -208,6 +217,10 @@ export function validateLayoutEditorState(state) {
     warnings.push("Les murs contiennent plusieurs groupes deconnectes");
   }
   return { valid: errors.length === 0, errors: [...new Set(errors)], warnings };
+}
+
+function hasValidCoordinatePair(entity) {
+  return (entity.x === null && entity.y === null) || isLayoutEditorEntityPlaced(entity);
 }
 
 function wallComponentCount(walls) {
@@ -233,7 +246,7 @@ function wallComponentCount(walls) {
 }
 
 export function layoutEditorDraftKey(baseId) {
-  return `neuro-evolution-arcade.village-raid-layout-editor.v1.${baseId}`;
+  return `neuro-evolution-arcade.village-raid-layout-editor.v2.${baseId}`;
 }
 
 export function serializeLayoutEditorDraft(state) {
@@ -248,9 +261,8 @@ export function parseLayoutEditorDraft(serialized, initialState) {
       return { state: initialState, warning: "Brouillon incompatible ignore" };
     }
     const draftState = payload.state;
-    if (!isRecord(draftState) || !isValidDraftCalibration(draftState.calibration) ||
-      !Array.isArray(draftState.buildings) || !Array.isArray(draftState.walls) ||
-      !Array.isArray(draftState.traps)) {
+    if (!isRecord(draftState) || !Array.isArray(draftState.buildings) ||
+      !Array.isArray(draftState.walls) || !Array.isArray(draftState.traps)) {
       return { state: initialState, warning: "Brouillon invalide ignore" };
     }
     const buildings = restoreStableEntityCoordinates(
@@ -258,13 +270,12 @@ export function parseLayoutEditorDraft(serialized, initialState) {
       initialState.buildings,
     );
     const traps = restoreStableEntityCoordinates(draftState.traps, initialState.traps);
-    const walls = restoreWallCoordinates(draftState.walls, initialState.walls);
+    const walls = restoreWallCoordinates(draftState.walls);
     if (!buildings || !traps || !walls) {
       return { state: initialState, warning: "Brouillon invalide ignore" };
     }
     const candidate = {
       ...initialState,
-      calibration: restoreDraftCalibration(draftState.calibration),
       requiredBuildingIds: [...initialState.requiredBuildingIds],
       requiredTrapIds: [...initialState.requiredTrapIds],
       buildings,
@@ -272,7 +283,7 @@ export function parseLayoutEditorDraft(serialized, initialState) {
       traps,
     };
     const validation = validateLayoutEditorState(candidate);
-    if (validation.errors.some((message) => !/50 murs places/i.test(message))) {
+    if (validation.errors.some((message) => !/rest(?:e|ent) en reserve/i.test(message))) {
       return { state: initialState, warning: "Brouillon invalide ignore" };
     }
     return { state: candidate, warning: null };
@@ -285,39 +296,12 @@ function isRecord(value) {
   return value !== null && typeof value === "object" && !Array.isArray(value);
 }
 
-function isFinitePoint(point) {
-  return isRecord(point) && Number.isFinite(point.x) && Number.isFinite(point.y);
-}
-
-function isValidDraftCalibration(calibration) {
-  if (!isRecord(calibration) || !isFinitePoint(calibration.anchorPx) ||
-    !isFinitePoint(calibration.anchorGrid) || !isFinitePoint(calibration.columnBasis) ||
-    !isFinitePoint(calibration.rowBasis) || !Number.isFinite(calibration.axisCells) ||
-    calibration.axisCells <= 0) {
-    return false;
-  }
-  const determinant = calibration.columnBasis.x * calibration.rowBasis.y -
-    calibration.columnBasis.y * calibration.rowBasis.x;
-  return Number.isFinite(determinant) && Math.abs(determinant) >= 1e-8;
-}
-
-function restoreDraftCalibration(calibration) {
-  return {
-    anchorPx: clonePoint(calibration.anchorPx),
-    anchorGrid: clonePoint(calibration.anchorGrid),
-    columnBasis: clonePoint(calibration.columnBasis),
-    rowBasis: clonePoint(calibration.rowBasis),
-    axisCells: calibration.axisCells,
-  };
-}
-
 function restoreStableEntityCoordinates(draftEntities, initialEntities) {
   if (draftEntities.length !== initialEntities.length) return null;
   const draftById = new Map();
   for (const entity of draftEntities) {
     if (!isRecord(entity) || typeof entity.id !== "string" ||
-      !Number.isInteger(entity.x) || !Number.isInteger(entity.y) ||
-      draftById.has(entity.id)) {
+      !hasValidCoordinatePair(entity) || draftById.has(entity.id)) {
       return null;
     }
     draftById.set(entity.id, entity);
@@ -329,17 +313,17 @@ function restoreStableEntityCoordinates(draftEntities, initialEntities) {
   });
 }
 
-function restoreWallCoordinates(draftWalls, initialWalls) {
-  if (draftWalls.length > initialWalls.length || !initialWalls.length) return null;
-  const canonical = initialWalls[0];
+function restoreWallCoordinates(draftWalls) {
+  if (draftWalls.length > LAYOUT_EDITOR_COUNTS.walls) return null;
   const restored = [];
   for (const [index, wall] of draftWalls.entries()) {
     if (!isRecord(wall) || !Number.isInteger(wall.x) || !Number.isInteger(wall.y)) {
       return null;
     }
     restored.push({
-      ...canonical,
       id: `wall-${index + 1}`,
+      type: "wall",
+      level: 3,
       x: wall.x,
       y: wall.y,
     });
@@ -358,15 +342,10 @@ export function serializeLayoutEditorExport(state) {
   return JSON.stringify({
     schema: LAYOUT_EDITOR_SCHEMA,
     baseId: state.baseId,
-    calibration: state.calibration,
     buildings,
     walls: [...state.walls].sort(sortCells).map(({ x, y }) => [x, y]),
     traps: [...state.traps].sort(sortCells).map(({ x, y }) => [x, y]),
   }, null, 2);
-}
-
-export function setLayoutEditorCalibration(state, calibration) {
-  return { ...state, calibration: structuredClone(calibration) };
 }
 
 export function createLayoutEditorHistory(initialState) {
@@ -406,15 +385,4 @@ export function redoLayoutEditorHistory(history) {
 
 export function resetLayoutEditorHistory(history) {
   return commitLayoutEditorHistory(history, structuredClone(history.initial));
-}
-
-function clonePoint(point) {
-  return { x: Number(point.x), y: Number(point.y) };
-}
-
-function roundPoint(point) {
-  return {
-    x: Math.round(point.x * 1000) / 1000,
-    y: Math.round(point.y * 1000) / 1000,
-  };
 }

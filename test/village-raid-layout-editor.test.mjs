@@ -1,207 +1,252 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import {
+  LAYOUT_EDITOR_SCHEMA,
   applyLayoutEditorWallStroke,
   commitLayoutEditorHistory,
+  createEmptyLayoutEditorState,
   createLayoutEditorHistory,
-  createLayoutEditorState,
-  createScreenshotCalibration,
+  isLayoutEditorEntityPlaced,
   layoutEditorDraftKey,
+  layoutEditorReserveCounts,
   layoutEditorWallReserve,
-  moveLayoutEditorEntity,
   parseLayoutEditorDraft,
-  projectEditorGridPoint,
+  placeLayoutEditorEntity,
   redoLayoutEditorHistory,
+  removeLayoutEditorEntity,
   resetLayoutEditorHistory,
   serializeLayoutEditorDraft,
   serializeLayoutEditorExport,
-  snapEditorGridPoint,
   undoLayoutEditorHistory,
-  unprojectEditorScreenshotPoint,
   validateLayoutEditorState,
 } from "../src/village-raid-layout-editor.js";
 import { LAYOUTS } from "../src/village-raid-data.js";
 
 const farm = LAYOUTS.find(({ id }) => id === "farm-111");
-const defaultCalibration = createScreenshotCalibration(
-  { x: 500, y: 231 }, { x: 650, y: 331 }, { x: 350, y: 331 }, { x: 22, y: 18 },
-);
 
-test("three handles define one invertible screenshot lattice", () => {
-  const calibration = createScreenshotCalibration(
-    { x: 1310, y: 600 },
-    { x: 1527.5, y: 745 },
-    { x: 1092.5, y: 745 },
-    { x: 22, y: 16 },
-  );
-  assert.deepEqual(calibration.columnBasis, { x: 43.5, y: 29 });
-  assert.deepEqual(calibration.rowBasis, { x: -43.5, y: 29 });
-  const pixel = projectEditorGridPoint(calibration, { x: 28, y: 20 });
-  assert.deepEqual(pixel, { x: 1397, y: 890 });
-  assert.deepEqual(unprojectEditorScreenshotPoint(calibration, pixel), { x: 28, y: 20 });
-  assert.deepEqual(snapEditorGridPoint({ x: 27.51, y: 19.49 }), { x: 28, y: 19 });
-});
+function createCompletedState() {
+  const initial = createEmptyLayoutEditorState(farm);
+  const sourceBuildings = new Map(farm.buildings.map((entity) => [entity.id, entity]));
+  const sourceTraps = new Map(farm.traps.map((entity) => [entity.id, entity]));
+  return {
+    ...initial,
+    buildings: initial.buildings.map((entity) => ({
+      ...entity,
+      x: sourceBuildings.get(entity.id).x,
+      y: sourceBuildings.get(entity.id).y,
+    })),
+    walls: farm.walls.map((wall) => ({ ...wall })),
+    traps: initial.traps.map((entity) => ({
+      ...entity,
+      x: sourceTraps.get(entity.id).x,
+      y: sourceTraps.get(entity.id).y,
+    })),
+  };
+}
 
-test("a singular screenshot lattice cannot be inverted", () => {
-  const calibration = createScreenshotCalibration(
-    { x: 100, y: 100 },
-    { x: 200, y: 200 },
-    { x: 300, y: 300 },
-    { x: 22, y: 16 },
-  );
-  assert.equal(unprojectEditorScreenshotPoint(calibration, { x: 150, y: 150 }), null);
-});
-
-test("editor state clones the locked production inventory", () => {
-  const state = createLayoutEditorState(farm, defaultCalibration);
+test("empty editor state preserves the locked roster entirely in reserve", () => {
+  const state = createEmptyLayoutEditorState(farm);
+  assert.equal(LAYOUT_EDITOR_SCHEMA, "village-raid-layout-editor-v2");
+  assert.equal(state.schema, LAYOUT_EDITOR_SCHEMA);
   assert.equal(state.buildings.length, 22);
-  assert.equal(state.walls.length, 50);
   assert.equal(state.traps.length, 2);
-  assert.equal(layoutEditorWallReserve(state), 0);
-  assert.notEqual(state.buildings, farm.buildings);
+  assert.equal(state.walls.length, 0);
+  assert.ok([...state.buildings, ...state.traps].every((entity) =>
+    entity.x === null && entity.y === null
+  ));
+  assert.ok([...state.buildings, ...state.traps].every((entity) =>
+    !isLayoutEditorEntityPlaced(entity)
+  ));
+  assert.deepEqual(layoutEditorReserveCounts(state), {
+    buildings: 22,
+    walls: 50,
+    traps: 2,
+  });
+  assert.equal(layoutEditorWallReserve(state), 50);
 });
 
-test("valid entity moves commit while overlaps revert atomically", () => {
-  const state = createLayoutEditorState(farm, defaultCalibration);
-  const moved = moveLayoutEditorEntity(
+test("placing and removing a reserved building keeps canonical metadata", () => {
+  const initial = createEmptyLayoutEditorState(farm);
+  const canonical = initial.buildings.find(({ id }) => id === "cannon-1");
+  const placed = placeLayoutEditorEntity(
+    initial,
+    { kind: "building", id: canonical.id },
+    { x: 6, y: 7 },
+  );
+  assert.equal(placed.error, null);
+  assert.deepEqual(
+    placed.state.buildings.find(({ id }) => id === canonical.id),
+    { ...canonical, x: 6, y: 7 },
+  );
+  assert.deepEqual(layoutEditorReserveCounts(placed.state), {
+    buildings: 21,
+    walls: 50,
+    traps: 2,
+  });
+
+  const removed = removeLayoutEditorEntity(
+    placed.state,
+    { kind: "building", id: canonical.id },
+  );
+  assert.equal(removed.error, null);
+  assert.deepEqual(
+    removed.state.buildings.find(({ id }) => id === canonical.id),
+    canonical,
+  );
+});
+
+test("reserve placement rejects footprint overlap and off-grid cells atomically", () => {
+  let state = createEmptyLayoutEditorState(farm);
+  state = placeLayoutEditorEntity(
     state,
-    { kind: "building", id: "builderHut-1" },
+    { kind: "building", id: "cannon-1" },
+    { x: 2, y: 2 },
+  ).state;
+  const overlap = placeLayoutEditorEntity(
+    state,
+    { kind: "trap", id: "bomb-1" },
+    { x: 3, y: 3 },
+  );
+  assert.equal(overlap.state, state);
+  assert.match(overlap.error, /chevauche/i);
+  const offGrid = placeLayoutEditorEntity(
+    state,
+    { kind: "building", id: "townHall-1" },
+    { x: 47, y: 31 },
+  );
+  assert.equal(offGrid.state, state);
+  assert.match(offGrid.error, /hors/i);
+});
+
+test("placing on the current cell and removing an entity already in reserve are no-ops", () => {
+  const initial = createEmptyLayoutEditorState(farm);
+  const placed = placeLayoutEditorEntity(
+    initial,
+    { kind: "trap", id: "bomb-1" },
+    { x: 8, y: 9 },
+  ).state;
+  const unchanged = placeLayoutEditorEntity(
+    placed,
+    { kind: "trap", id: "bomb-1" },
+    { x: 8, y: 9 },
+  );
+  assert.equal(unchanged.error, null);
+  assert.equal(unchanged.state, placed);
+
+  const reserved = removeLayoutEditorEntity(
+    initial,
+    { kind: "trap", id: "bomb-1" },
+  );
+  assert.equal(reserved.error, null);
+  assert.equal(reserved.state, initial);
+});
+
+test("unknown entity selections fail atomically", () => {
+  const state = createEmptyLayoutEditorState(farm);
+  for (const operation of [placeLayoutEditorEntity, removeLayoutEditorEntity]) {
+    const result = operation(
+      state,
+      { kind: "decoration", id: "bomb-1" },
+      { x: 1, y: 1 },
+    );
+    assert.equal(result.state, state);
+    assert.match(result.error, /inconnu/i);
+  }
+  const missing = placeLayoutEditorEntity(
+    state,
+    { kind: "building", id: "missing" },
     { x: 1, y: 1 },
   );
-  assert.equal(moved.error, null);
-  assert.deepEqual(
-    moved.state.buildings.find(({ id }) => id === "builderHut-1"),
-    { ...state.buildings.find(({ id }) => id === "builderHut-1"), x: 1, y: 1 },
-  );
-  const blocked = moveLayoutEditorEntity(
-    state,
-    { kind: "building", id: "builderHut-1" },
-    { x: state.buildings[0].x, y: state.buildings[0].y },
-  );
-  assert.match(blocked.error, /chevauche/i);
-  assert.equal(blocked.state, state);
+  assert.equal(missing.state, state);
+  assert.match(missing.error, /inconnu/i);
 });
 
-test("wall erase and paint preserve the fixed capacity through reserve", () => {
-  const state = createLayoutEditorState(farm, defaultCalibration);
-  const removedCell = { x: state.walls[0].x, y: state.walls[0].y };
-  const erased = applyLayoutEditorWallStroke(state, "erase", [removedCell, removedCell]);
-  assert.equal(erased.state.walls.length, 49);
-  assert.equal(layoutEditorWallReserve(erased.state), 1);
-  const painted = applyLayoutEditorWallStroke(erased.state, "paint", [{ x: 1, y: 30 }]);
-  assert.equal(painted.error, null);
-  assert.equal(painted.state.walls.length, 50);
-  assert.equal(layoutEditorWallReserve(painted.state), 0);
-  const overCapacity = applyLayoutEditorWallStroke(
-    painted.state,
+test("wall paint and erase consume and restore the fixed reserve", () => {
+  const initial = createEmptyLayoutEditorState(farm);
+  const painted = applyLayoutEditorWallStroke(
+    initial,
     "paint",
-    [{ x: 2, y: 30 }],
+    [{ x: 1, y: 1 }, { x: 1, y: 1 }, { x: 2, y: 1 }],
   );
-  assert.match(overCapacity.error, /reserve/i);
-  assert.equal(overCapacity.state, painted.state);
+  assert.equal(painted.error, null);
+  assert.equal(painted.state.walls.length, 2);
+  assert.equal(layoutEditorWallReserve(painted.state), 48);
+  const erased = applyLayoutEditorWallStroke(
+    painted.state,
+    "erase",
+    [{ x: 1, y: 1 }],
+  );
+  assert.equal(erased.state.walls.length, 1);
+  assert.equal(layoutEditorWallReserve(erased.state), 49);
 });
 
-test("history groups one edit and supports undo redo and reset", () => {
-  const initial = createLayoutEditorState(farm, defaultCalibration);
-  const moved = moveLayoutEditorEntity(
+test("walls reject occupied or off-grid cells atomically", () => {
+  const initial = createEmptyLayoutEditorState(farm);
+  const withBuilding = placeLayoutEditorEntity(
     initial,
     { kind: "building", id: "builderHut-1" },
     { x: 1, y: 1 },
   ).state;
-  let history = commitLayoutEditorHistory(createLayoutEditorHistory(initial), moved);
+  for (const cell of [{ x: 1, y: 1 }, { x: 48, y: 0 }]) {
+    const result = applyLayoutEditorWallStroke(withBuilding, "paint", [cell]);
+    assert.equal(result.state, withBuilding);
+    assert.match(result.error, /terrain|occupee/i);
+  }
+});
+
+test("wall paint never exceeds the reserve", () => {
+  const complete = createCompletedState();
+  const result = applyLayoutEditorWallStroke(complete, "paint", [{ x: 0, y: 31 }]);
+  assert.equal(result.state, complete);
+  assert.match(result.error, /reserve/i);
+});
+
+test("validation and export remain blocked until every reserve is empty", () => {
+  const state = createEmptyLayoutEditorState(farm);
+  const result = validateLayoutEditorState(state);
+  assert.equal(result.valid, false);
+  assert.match(result.errors.join(" "), /22 batiments.*reserve/i);
+  assert.match(result.errors.join(" "), /50 murs.*reserve/i);
+  assert.match(result.errors.join(" "), /2 bombes.*reserve/i);
+  assert.throws(() => serializeLayoutEditorExport(state), /reserve/i);
+});
+
+test("a completed locked roster validates and reports disconnected walls separately", () => {
+  const state = createCompletedState();
+  assert.equal(validateLayoutEditorState(state).valid, true);
+  const disconnected = {
+    ...state,
+    walls: state.walls.map((wall, index) => index === 0
+      ? { ...wall, x: 0, y: 31 }
+      : wall),
+  };
+  const result = validateLayoutEditorState(disconnected);
+  assert.equal(result.valid, true);
+  assert.match(result.warnings.join(" "), /deconnect/i);
+});
+
+test("history supports undo redo reset and avoids phantom no-op commits", () => {
+  const initial = createEmptyLayoutEditorState(farm);
+  const placed = placeLayoutEditorEntity(
+    initial,
+    { kind: "building", id: "builderHut-1" },
+    { x: 1, y: 1 },
+  ).state;
+  let history = createLayoutEditorHistory(initial);
+  assert.equal(commitLayoutEditorHistory(history, history.present), history);
+  history = commitLayoutEditorHistory(history, placed);
   assert.equal(history.present.buildings.find(({ id }) => id === "builderHut-1").x, 1);
   history = undoLayoutEditorHistory(history);
-  assert.equal(
-    history.present.buildings.find(({ id }) => id === "builderHut-1").x,
-    initial.buildings.find(({ id }) => id === "builderHut-1").x,
-  );
+  assert.equal(history.present.buildings.find(({ id }) => id === "builderHut-1").x, null);
   history = redoLayoutEditorHistory(history);
   assert.equal(history.present.buildings.find(({ id }) => id === "builderHut-1").x, 1);
   history = resetLayoutEditorHistory(history);
   assert.deepEqual(history.present, initial);
 });
 
-test("moving an entity to its current cell is a no-op without phantom history", () => {
-  const state = createLayoutEditorState(farm, defaultCalibration);
-  const hut = state.buildings.find(({ id }) => id === "builderHut-1");
-  const unchanged = moveLayoutEditorEntity(
-    state,
-    { kind: "building", id: hut.id },
-    { x: hut.x, y: hut.y },
-  );
-  assert.equal(unchanged.error, null);
-  assert.equal(unchanged.state, state);
-
-  const history = createLayoutEditorHistory(state);
-  assert.equal(commitLayoutEditorHistory(history, unchanged.state), history);
-  assert.deepEqual(history.past, []);
-});
-
-test("painting only existing walls preserves the state reference", () => {
-  const state = createLayoutEditorState(farm, defaultCalibration);
-  const existingCell = { x: state.walls[0].x, y: state.walls[0].y };
-  const unchanged = applyLayoutEditorWallStroke(
-    state,
-    "paint",
-    [existingCell, existingCell],
-  );
-  assert.equal(unchanged.error, null);
-  assert.equal(unchanged.state, state);
-});
-
-test("an unknown entity selection kind fails atomically", () => {
-  const state = createLayoutEditorState(farm, defaultCalibration);
-  const result = moveLayoutEditorEntity(
-    state,
-    { kind: "decoration", id: state.traps[0].id },
-    { x: 1, y: 1 },
-  );
-  assert.match(result.error, /inconnu/i);
-  assert.equal(result.state, state);
-});
-
-test("building trap and wall edits reject off-grid cells atomically", () => {
-  const state = createLayoutEditorState(farm, defaultCalibration);
-  const building = moveLayoutEditorEntity(
-    state,
-    { kind: "building", id: "builderHut-1" },
-    { x: 47, y: 31 },
-  );
-  assert.match(building.error, /terrain/i);
-  assert.equal(building.state, state);
-
-  const trap = moveLayoutEditorEntity(
-    state,
-    { kind: "trap", id: state.traps[0].id },
-    { x: -1, y: 0 },
-  );
-  assert.match(trap.error, /terrain/i);
-  assert.equal(trap.state, state);
-
-  const removedCell = { x: state.walls[0].x, y: state.walls[0].y };
-  const erased = applyLayoutEditorWallStroke(state, "erase", [removedCell]).state;
-  const wall = applyLayoutEditorWallStroke(erased, "paint", [{ x: 48, y: 0 }]);
-  assert.match(wall.error, /terrain/i);
-  assert.equal(wall.state, erased);
-});
-
-test("painting a wall on an entity fails atomically", () => {
-  const state = createLayoutEditorState(farm, defaultCalibration);
-  const removedCell = { x: state.walls[0].x, y: state.walls[0].y };
-  const erased = applyLayoutEditorWallStroke(state, "erase", [removedCell]).state;
-  const townHall = erased.buildings.find(({ id }) => id === "townHall-1");
-  const blocked = applyLayoutEditorWallStroke(
-    erased,
-    "paint",
-    [{ x: townHall.x, y: townHall.y }],
-  );
-  assert.match(blocked.error, /occupee/i);
-  assert.equal(blocked.state, erased);
-});
-
-test("a new commit invalidates redo without mutating history arrays", () => {
-  const initial = createLayoutEditorState(farm, defaultCalibration);
-  const firstMove = moveLayoutEditorEntity(
+test("a new history commit invalidates redo without mutating prior arrays", () => {
+  const initial = createEmptyLayoutEditorState(farm);
+  const first = placeLayoutEditorEntity(
     initial,
     { kind: "building", id: "builderHut-1" },
     { x: 1, y: 1 },
@@ -209,252 +254,158 @@ test("a new commit invalidates redo without mutating history arrays", () => {
   const original = createLayoutEditorHistory(initial);
   Object.freeze(original.past);
   Object.freeze(original.future);
-
-  const committed = commitLayoutEditorHistory(original, firstMove);
-  assert.deepEqual(original.past, []);
-  assert.deepEqual(original.future, []);
-  Object.freeze(committed.past);
-  Object.freeze(committed.future);
-
+  const committed = commitLayoutEditorHistory(original, first);
   const undone = undoLayoutEditorHistory(committed);
-  assert.equal(committed.present, firstMove);
-  assert.deepEqual(committed.future, []);
-  assert.deepEqual(undone.future, [firstMove]);
   Object.freeze(undone.past);
   Object.freeze(undone.future);
-
-  const secondMove = moveLayoutEditorEntity(
+  const second = placeLayoutEditorEntity(
     undone.present,
     { kind: "building", id: "builderHut-1" },
     { x: 2, y: 2 },
   ).state;
-  const recommitted = commitLayoutEditorHistory(undone, secondMove);
+  const recommitted = commitLayoutEditorHistory(undone, second);
   assert.deepEqual(recommitted.future, []);
-  assert.deepEqual(undone.future, [firstMove]);
+  assert.deepEqual(undone.future, [first]);
   assert.notEqual(recommitted.past, undone.past);
   assert.notEqual(recommitted.future, undone.future);
 });
 
-test("validation separates blocking inventory errors from wall connectivity warnings", () => {
-  const state = createLayoutEditorState(farm, defaultCalibration);
-  const valid = validateLayoutEditorState(state);
-  assert.equal(valid.valid, true);
-  const missingWall = { ...state, walls: state.walls.slice(1) };
-  const invalid = validateLayoutEditorState(missingWall);
-  assert.equal(invalid.valid, false);
-  assert.match(invalid.errors.join(" "), /50 murs/i);
-  const disconnected = { ...state, walls: state.walls.map((wall, index) =>
-    index === 0 ? { ...wall, x: 0, y: 31 } : wall
-  ) };
-  assert.match(validateLayoutEditorState(disconnected).warnings.join(" "), /deconnect/i);
-});
-
-test("draft parsing recovers compatible state and rejects corrupt input", () => {
-  const state = createLayoutEditorState(farm, defaultCalibration);
-  assert.equal(layoutEditorDraftKey("farm-111"),
-    "neuro-evolution-arcade.village-raid-layout-editor.v1.farm-111");
-  const restored = parseLayoutEditorDraft(serializeLayoutEditorDraft(state), state);
-  assert.deepEqual(restored.state, state);
-  assert.equal(restored.warning, null);
-  const corrupt = parseLayoutEditorDraft("not-json", state);
-  assert.equal(corrupt.state, state);
-  assert.match(corrupt.warning, /ignore/i);
-});
-
-test("draft parsing preserves incomplete wall work", () => {
-  const initial = createLayoutEditorState(farm, defaultCalibration);
-  const incomplete = { ...initial, walls: initial.walls.slice(1) };
-  const restored = parseLayoutEditorDraft(serializeLayoutEditorDraft(incomplete), initial);
-  assert.equal(restored.state.walls.length, incomplete.walls.length);
-  assert.deepEqual(
-    restored.state.walls.map(({ x, y }) => ({ x, y })),
-    incomplete.walls.map(({ x, y }) => ({ x, y })),
-  );
-  assert.equal(restored.warning, null);
-});
-
-test("draft parsing restores building coordinates with canonical metadata", () => {
-  const initial = createLayoutEditorState(farm, defaultCalibration);
-  const canonical = initial.buildings.find(({ id }) => id === "builderHut-1");
-  const draft = {
-    ...initial,
-    buildings: initial.buildings.map((building) => building.id === canonical.id
-      ? {
-        ...building,
-        x: 1,
-        y: 1,
-        type: "mortar",
-        level: 999,
-        width: 12,
-        height: 14,
-      }
-      : building),
-  };
-
-  const restored = parseLayoutEditorDraft(serializeLayoutEditorDraft(draft), initial);
-
-  assert.deepEqual(
-    restored.state.buildings.find(({ id }) => id === canonical.id),
-    { ...canonical, x: 1, y: 1 },
-  );
-  assert.equal(restored.warning, null);
-});
-
-test("draft parsing restores trap coordinates with canonical metadata", () => {
-  const initial = createLayoutEditorState(farm, defaultCalibration);
-  const canonical = initial.traps[0];
-  const draft = {
-    ...initial,
-    traps: initial.traps.map((trap) => trap.id === canonical.id
-      ? { ...trap, type: "wall", level: 999, width: 8, height: 9 }
-      : trap),
-  };
-
-  const restored = parseLayoutEditorDraft(serializeLayoutEditorDraft(draft), initial);
-
-  assert.deepEqual(
-    restored.state.traps.find(({ id }) => id === canonical.id),
-    canonical,
-  );
-  assert.equal(restored.warning, null);
-});
-
-test("draft parsing rejects null calibration", () => {
-  const initial = createLayoutEditorState(farm, defaultCalibration);
-  const serialized = serializeLayoutEditorDraft({ ...initial, calibration: null });
-
-  const restored = parseLayoutEditorDraft(serialized, initial);
-
-  assert.equal(restored.state, initial);
-  assert.match(restored.warning, /ignore/i);
-});
-
-test("draft parsing rejects non-finite calibration", () => {
-  const initial = createLayoutEditorState(farm, defaultCalibration);
-  const serialized = serializeLayoutEditorDraft(initial).replace(
-    '"axisCells":5',
-    '"axisCells":1e999',
-  );
-
-  const restored = parseLayoutEditorDraft(serialized, initial);
-
-  assert.equal(restored.state, initial);
-  assert.match(restored.warning, /ignore/i);
-});
-
-test("draft parsing rejects singular calibration", () => {
-  const initial = createLayoutEditorState(farm, defaultCalibration);
-  const singular = createScreenshotCalibration(
-    { x: 100, y: 100 },
-    { x: 200, y: 200 },
-    { x: 300, y: 300 },
-    initial.calibration.anchorGrid,
-  );
-  const serialized = serializeLayoutEditorDraft({ ...initial, calibration: singular });
-
-  const restored = parseLayoutEditorDraft(serialized, initial);
-
-  assert.equal(restored.state, initial);
-  assert.match(restored.warning, /ignore/i);
-});
-
-test("draft parsing strips unknown calibration fields", () => {
-  const initial = createLayoutEditorState(farm, defaultCalibration);
-  const calibration = {
-    ...initial.calibration,
-    injected: "ignore-me",
-    anchorPx: { ...initial.calibration.anchorPx, injected: "ignore-me" },
-  };
-
-  const restored = parseLayoutEditorDraft(
-    serializeLayoutEditorDraft({ ...initial, calibration }),
+test("v2 drafts preserve nullable reserve coordinates and reject v1", () => {
+  const initial = createEmptyLayoutEditorState(farm);
+  const placed = placeLayoutEditorEntity(
     initial,
-  );
+    { kind: "building", id: "builderHut-1" },
+    { x: 1, y: 1 },
+  ).state;
+  const restored = parseLayoutEditorDraft(serializeLayoutEditorDraft(placed), initial);
+  assert.deepEqual(restored.state, placed);
+  assert.equal(restored.warning, null);
+  const v1 = JSON.stringify({ schema: "village-raid-layout-editor-v1", state: placed });
+  const rejected = parseLayoutEditorDraft(v1, initial);
+  assert.equal(rejected.state, initial);
+  assert.match(rejected.warning, /incompatible/i);
+  assert.match(layoutEditorDraftKey("farm-111"), /\.v2\.farm-111$/);
+});
 
-  assert.deepEqual(restored.state.calibration, initial.calibration);
+test("draft parsing restores canonical building and trap metadata", () => {
+  const initial = createEmptyLayoutEditorState(farm);
+  const canonicalBuilding = initial.buildings.find(({ id }) => id === "builderHut-1");
+  const canonicalTrap = initial.traps.find(({ id }) => id === "bomb-1");
+  const draft = {
+    ...initial,
+    buildings: initial.buildings.map((entity) => entity.id === canonicalBuilding.id
+      ? { ...entity, x: 1, y: 1, type: "mortar", level: 999, width: 12, height: 14 }
+      : entity),
+    traps: initial.traps.map((entity) => entity.id === canonicalTrap.id
+      ? { ...entity, x: 8, y: 8, type: "wall", level: 999 }
+      : entity),
+  };
+  const restored = parseLayoutEditorDraft(serializeLayoutEditorDraft(draft), initial);
+  assert.deepEqual(
+    restored.state.buildings.find(({ id }) => id === canonicalBuilding.id),
+    { ...canonicalBuilding, x: 1, y: 1 },
+  );
+  assert.deepEqual(
+    restored.state.traps.find(({ id }) => id === canonicalTrap.id),
+    { ...canonicalTrap, x: 8, y: 8 },
+  );
+});
+
+test("draft parsing preserves incomplete walls with canonical metadata", () => {
+  const initial = createEmptyLayoutEditorState(farm);
+  const draft = {
+    ...initial,
+    walls: [
+      { id: "forged", type: "building", level: 999, x: 2, y: 3 },
+      { id: "forged-again", x: 3, y: 3 },
+    ],
+  };
+  const restored = parseLayoutEditorDraft(serializeLayoutEditorDraft(draft), initial);
+  assert.deepEqual(restored.state.walls, [
+    { id: "wall-1", type: "wall", level: 3, x: 2, y: 3 },
+    { id: "wall-2", type: "wall", level: 3, x: 3, y: 3 },
+  ]);
   assert.equal(restored.warning, null);
 });
 
-test("draft parsing rejects malformed or non-array collections", () => {
-  const initial = createLayoutEditorState(farm, defaultCalibration);
-  const malformedCollections = [
-    { buildings: null },
-    { buildings: [null] },
-    { walls: {} },
-    { walls: [null] },
-    { traps: "invalid" },
-    { traps: [null] },
+test("draft parsing rejects mixed nullable pairs and malformed collections", () => {
+  const initial = createEmptyLayoutEditorState(farm);
+  const mixed = {
+    ...initial,
+    buildings: initial.buildings.map((entity, index) => index === 0
+      ? { ...entity, x: null, y: 2 }
+      : entity),
+  };
+  const malformed = [
+    mixed,
+    { ...initial, buildings: null },
+    { ...initial, buildings: [null] },
+    { ...initial, walls: {} },
+    { ...initial, walls: [null] },
+    { ...initial, traps: "invalid" },
+    { ...initial, traps: [null] },
   ];
+  for (const draft of malformed) {
+    const restored = parseLayoutEditorDraft(serializeLayoutEditorDraft(draft), initial);
+    assert.equal(restored.state, initial);
+    assert.match(restored.warning, /ignore/i);
+  }
+});
 
-  for (const malformed of malformedCollections) {
-    const serialized = serializeLayoutEditorDraft({ ...initial, ...malformed });
+test("draft parsing never replaces the locked inventories", () => {
+  const initial = createEmptyLayoutEditorState(farm);
+  for (const draft of [
+    { ...initial, buildings: initial.buildings.slice(1) },
+    { ...initial, traps: initial.traps.slice(1) },
+    { ...initial, walls: Array.from({ length: 51 }, (_, index) => ({ x: index, y: 0 })) },
+  ]) {
+    const restored = parseLayoutEditorDraft(serializeLayoutEditorDraft(draft), initial);
+    assert.equal(restored.state, initial);
+    assert.match(restored.warning, /ignore/i);
+  }
+});
+
+test("draft parsing rejects corrupt, off-grid, and overlapping state", () => {
+  const initial = createEmptyLayoutEditorState(farm);
+  const offGrid = placeLayoutEditorEntity(
+    initial,
+    { kind: "building", id: "builderHut-1" },
+    { x: 1, y: 1 },
+  ).state;
+  offGrid.buildings = offGrid.buildings.map((entity) => entity.id === "builderHut-1"
+    ? { ...entity, x: 48, y: 1 }
+    : entity);
+  const overlapping = {
+    ...initial,
+    walls: [{ x: 1, y: 1 }],
+    traps: initial.traps.map((entity, index) => index === 0
+      ? { ...entity, x: 1, y: 1 }
+      : entity),
+  };
+  for (const serialized of [
+    "not-json",
+    serializeLayoutEditorDraft(offGrid),
+    serializeLayoutEditorDraft(overlapping),
+  ]) {
     const restored = parseLayoutEditorDraft(serialized, initial);
     assert.equal(restored.state, initial);
     assert.match(restored.warning, /ignore/i);
   }
 });
 
-test("draft parsing rebuilds incomplete walls with canonical metadata", () => {
-  const initial = createLayoutEditorState(farm, defaultCalibration);
-  const draftCoordinates = initial.walls.slice(1).map(({ x, y }) => ({ x, y })).reverse();
-  const draft = {
-    ...initial,
-    walls: draftCoordinates.map(({ x, y }, index) => ({
-      id: `forged-wall-${index}`,
-      type: "building",
-      level: 999,
-      x,
-      y,
-    })),
-  };
-
-  const restored = parseLayoutEditorDraft(serializeLayoutEditorDraft(draft), initial);
-  const expected = draftCoordinates.map(({ x, y }, index) => ({
-    id: `wall-${index + 1}`,
-    type: initial.walls[0].type,
-    level: initial.walls[0].level,
-    x,
-    y,
-  }));
-
-  assert.deepEqual(restored.state.walls, expected);
-  assert.equal(restored.warning, null);
+test("reset returns a partially built village to the empty initial state", () => {
+  const initial = createEmptyLayoutEditorState(farm);
+  const partial = placeLayoutEditorEntity(
+    initial,
+    { kind: "building", id: "builderHut-1" },
+    { x: 1, y: 1 },
+  ).state;
+  const history = commitLayoutEditorHistory(createLayoutEditorHistory(initial), partial);
+  assert.deepEqual(resetLayoutEditorHistory(history).present, initial);
 });
 
-test("draft parsing never replaces the locked building inventory", () => {
-  const initial = createLayoutEditorState(farm, defaultCalibration);
-  const draft = {
-    ...initial,
-    requiredBuildingIds: initial.requiredBuildingIds.slice(1),
-    buildings: initial.buildings.slice(1),
-  };
-  const restored = parseLayoutEditorDraft(serializeLayoutEditorDraft(draft), initial);
-  assert.equal(restored.state, initial);
-  assert.match(restored.warning, /ignore/i);
-});
-
-test("draft parsing never replaces the locked trap inventory", () => {
-  const initial = createLayoutEditorState(farm, defaultCalibration);
-  const draft = {
-    ...initial,
-    requiredTrapIds: initial.requiredTrapIds.slice(1),
-    traps: initial.traps.slice(1),
-  };
-  const restored = parseLayoutEditorDraft(serializeLayoutEditorDraft(draft), initial);
-  assert.equal(restored.state, initial);
-  assert.match(restored.warning, /ignore/i);
-});
-
-test("export rejects incomplete wall work", () => {
-  const state = createLayoutEditorState(farm, defaultCalibration);
-  assert.throws(
-    () => serializeLayoutEditorExport({ ...state, walls: state.walls.slice(1) }),
-    /50 murs/i,
-  );
-});
-
-test("approved export is stable and sorts walls and bombs", () => {
-  const state = createLayoutEditorState(farm, defaultCalibration);
+test("approved v2 export is stable, minimal, and sorted", () => {
+  const state = createCompletedState();
   const first = serializeLayoutEditorExport(state);
   const second = serializeLayoutEditorExport({
     ...state,
@@ -463,7 +414,8 @@ test("approved export is stable and sorts walls and bombs", () => {
   });
   assert.equal(first, second);
   const payload = JSON.parse(first);
-  assert.equal(payload.schema, "village-raid-layout-editor-v1");
+  assert.deepEqual(Object.keys(payload), ["schema", "baseId", "buildings", "walls", "traps"]);
+  assert.equal(payload.schema, "village-raid-layout-editor-v2");
   assert.equal(payload.baseId, "farm-111");
   assert.equal(Object.keys(payload.buildings).length, 22);
   assert.equal(payload.walls.length, 50);
