@@ -26,7 +26,7 @@ test("manual editor loads bundled references before temporary launch overrides",
   const script = await readFile(scriptUrl, "utf8");
   assert.match(
     script,
-    /for \(const \[baseId, source\] of Object\.entries\(BUNDLED_REFERENCE_SOURCES\)\) \{[\s\S]*?loadSourceImage\(baseId, source\);[\s\S]*?for \(const \[baseId, key\] of Object\.entries\(SOURCE_KEYS\)\)/,
+    /for \(const \[baseId, source\] of Object\.entries\(BUNDLED_REFERENCE_SOURCES\)\) \{[\s\S]*?loadSourceImage\(baseId, source, false, true\);[\s\S]*?for \(const \[baseId, key\] of Object\.entries\(SOURCE_KEYS\)\)/,
   );
 });
 
@@ -118,12 +118,14 @@ test("source loading preserves the last successful image when a replacement fail
   const bundledRecord = { isObjectUrl: false, url: "file:///farm-111.jpg" };
   const sourceImages = new Map([["farm-111", bundledRecord]]);
   const sourceAttempts = new Map();
+  const bundledSourceAttempts = new Map();
   const sourceMessages = new Map();
   let renderCount = 0;
   let nextImage = null;
   const loadSourceImage = Function(
     "sourceImages",
     "sourceAttempts",
+    "bundledSourceAttempts",
     "sourceMessages",
     "location",
     "Image",
@@ -134,6 +136,7 @@ test("source loading preserves the last successful image when a replacement fail
   )(
     sourceImages,
     sourceAttempts,
+    bundledSourceAttempts,
     sourceMessages,
     { href: "http://127.0.0.1/editor", origin: "http://127.0.0.1" },
     class ControlledImage {
@@ -169,8 +172,67 @@ test("source loading preserves the last successful image when a replacement fail
   assert.match(sourceMessages.get("farm-111"), /reference est conservee/i);
   assert.match(
     script,
-    /for \(const \[baseId, source\] of Object\.entries\(BUNDLED_REFERENCE_SOURCES\)\) \{[\s\S]*?loadSourceImage\(baseId, source\);[\s\S]*?for \(const \[baseId, key\] of Object\.entries\(SOURCE_KEYS\)\)/,
+    /for \(const \[baseId, source\] of Object\.entries\(BUNDLED_REFERENCE_SOURCES\)\) \{[\s\S]*?loadSourceImage\(baseId, source, false, true\);[\s\S]*?for \(const \[baseId, key\] of Object\.entries\(SOURCE_KEYS\)\)/,
   );
+});
+
+test("a failed launch override leaves its pending bundled reference eligible to load", async () => {
+  const script = await readFile(scriptUrl, "utf8");
+  const loadSourceImageSource = script.match(
+    /function loadSourceImage\([\s\S]*?(?=\nfunction revokeSourceImage\()/,
+  )?.[0];
+  assert.ok(loadSourceImageSource, "loadSourceImage must remain extractable for regression coverage");
+
+  const sourceImages = new Map();
+  const sourceAttempts = new Map();
+  const bundledSourceAttempts = new Map();
+  const sourceMessages = new Map();
+  const images = [];
+  const loadSourceImage = Function(
+    "sourceImages",
+    "sourceAttempts",
+    "bundledSourceAttempts",
+    "sourceMessages",
+    "location",
+    "Image",
+    "revokeSourceImage",
+    "render",
+    "selectedBaseId",
+    `"use strict"; ${loadSourceImageSource}; return loadSourceImage;`,
+  )(
+    sourceImages,
+    sourceAttempts,
+    bundledSourceAttempts,
+    sourceMessages,
+    { href: "http://127.0.0.1/editor", origin: "http://127.0.0.1" },
+    class ControlledImage {
+      constructor() {
+        this.listeners = new Map();
+        images.push(this);
+      }
+
+      addEventListener(type, listener) {
+        this.listeners.set(type, listener);
+      }
+
+      emit(type) {
+        this.listeners.get(type)?.();
+      }
+    },
+    (baseId) => sourceImages.delete(baseId),
+    () => {},
+    "farm-111",
+  );
+
+  loadSourceImage("farm-111", "./farm-111.jpg", false, true);
+  loadSourceImage("farm-111", "./invalid-override.jpg");
+  assert.equal(images.length, 2);
+  images[1].emit("error");
+  assert.equal(sourceImages.has("farm-111"), false);
+  images[0].emit("load");
+  assert.equal(sourceImages.get("farm-111")?.image, images[0]);
+  assert.equal(sourceAttempts.has("farm-111"), false);
+  assert.equal(bundledSourceAttempts.has("farm-111"), false);
 });
 
 test("manual layout editor styling exposes responsive focus and disabled states", async () => {

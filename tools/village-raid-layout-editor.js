@@ -74,6 +74,7 @@ const histories = new Map();
 const draftWarnings = new Map();
 const sourceImages = new Map();
 const sourceAttempts = new Map();
+const bundledSourceAttempts = new Map();
 const sourceMessages = new Map();
 
 for (const layout of LAYOUTS) {
@@ -1246,7 +1247,7 @@ elements.sourceImage.addEventListener("change", () => {
   loadSourceImage(selectedBaseId, objectUrl, true);
 });
 
-function loadSourceImage(baseId, source, isObjectUrl = false) {
+function loadSourceImage(baseId, source, isObjectUrl = false, isBundled = false) {
   if (!isObjectUrl) {
     try {
       const url = new URL(source, location.href);
@@ -1263,13 +1264,14 @@ function loadSourceImage(baseId, source, isObjectUrl = false) {
     }
   }
 
-  const previousAttempt = sourceAttempts.get(baseId);
+  const attempts = isBundled ? bundledSourceAttempts : sourceAttempts;
+  const previousAttempt = attempts.get(baseId);
   if (previousAttempt?.isObjectUrl) URL.revokeObjectURL(previousAttempt.url);
-  sourceAttempts.delete(baseId);
+  attempts.delete(baseId);
 
   const image = new Image();
-  const record = { image, url: source, isObjectUrl };
-  sourceAttempts.set(baseId, record);
+  const record = { image, url: source, isObjectUrl, isBundled };
+  attempts.set(baseId, record);
   sourceMessages.set(
     baseId,
     isObjectUrl
@@ -1277,8 +1279,9 @@ function loadSourceImage(baseId, source, isObjectUrl = false) {
       : "Chargement de la photo de reference...",
   );
   image.addEventListener("load", () => {
-    if (sourceAttempts.get(baseId) !== record) return;
-    sourceAttempts.delete(baseId);
+    if (attempts.get(baseId) !== record) return;
+    attempts.delete(baseId);
+    if (isBundled && sourceImages.get(baseId)?.isBundled === false) return;
     revokeSourceImage(baseId);
     sourceImages.set(baseId, record);
     sourceMessages.set(
@@ -1290,8 +1293,8 @@ function loadSourceImage(baseId, source, isObjectUrl = false) {
     if (baseId === selectedBaseId) render();
   }, { once: true });
   image.addEventListener("error", () => {
-    if (sourceAttempts.get(baseId) !== record) return;
-    sourceAttempts.delete(baseId);
+    if (attempts.get(baseId) !== record) return;
+    attempts.delete(baseId);
     if (record.isObjectUrl) URL.revokeObjectURL(record.url);
     sourceMessages.set(
       baseId,
@@ -1310,14 +1313,15 @@ function revokeSourceImage(baseId) {
 
 window.addEventListener("beforeunload", () => {
   for (const baseId of sourceImages.keys()) revokeSourceImage(baseId);
-  for (const attempt of sourceAttempts.values()) {
+  for (const attempt of [...sourceAttempts.values(), ...bundledSourceAttempts.values()]) {
     if (attempt.isObjectUrl) URL.revokeObjectURL(attempt.url);
   }
   sourceAttempts.clear();
+  bundledSourceAttempts.clear();
 });
 
 for (const [baseId, source] of Object.entries(BUNDLED_REFERENCE_SOURCES)) {
-  loadSourceImage(baseId, source);
+  loadSourceImage(baseId, source, false, true);
 }
 for (const [baseId, key] of Object.entries(SOURCE_KEYS)) {
   const source = params.get(key);
