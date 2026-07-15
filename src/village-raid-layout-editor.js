@@ -220,36 +220,11 @@ export function validateLayoutEditorState(state) {
       occupied.set(key, entity.id);
     }
   }
-  if (state.walls.length && wallComponentCount(state.walls) > 1) {
-    warnings.push("Les murs contiennent plusieurs groupes deconnectes");
-  }
   return { valid: errors.length === 0, errors: [...new Set(errors)], warnings };
 }
 
 function hasValidCoordinatePair(entity) {
   return (entity.x === null && entity.y === null) || isLayoutEditorEntityPlaced(entity);
-}
-
-function wallComponentCount(walls) {
-  const remaining = new Set(walls.map(({ x, y }) => cellKey(x, y)));
-  let components = 0;
-  while (remaining.size) {
-    components += 1;
-    const queue = [remaining.values().next().value];
-    remaining.delete(queue[0]);
-    while (queue.length) {
-      const [x, y] = queue.shift().split(",").map(Number);
-      for (const neighbor of [
-        cellKey(x + 1, y),
-        cellKey(x - 1, y),
-        cellKey(x, y + 1),
-        cellKey(x, y - 1),
-      ]) {
-        if (remaining.delete(neighbor)) queue.push(neighbor);
-      }
-    }
-  }
-  return components;
 }
 
 export function layoutEditorDraftKey(baseId) {

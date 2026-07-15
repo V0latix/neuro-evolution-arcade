@@ -228,7 +228,7 @@ test("validation and export reject walls without integer coordinates", () => {
   assert.throws(() => serializeLayoutEditorExport(state), /coordonnees invalides/i);
 });
 
-test("a completed locked roster validates and reports disconnected walls separately", () => {
+test("a completed locked roster accepts disconnected wall compartments", () => {
   const state = createCompletedState();
   assert.equal(validateLayoutEditorState(state).valid, true);
   const disconnected = {
@@ -239,7 +239,7 @@ test("a completed locked roster validates and reports disconnected walls separat
   };
   const result = validateLayoutEditorState(disconnected);
   assert.equal(result.valid, true);
-  assert.match(result.warnings.join(" "), /deconnect/i);
+  assert.deepEqual(result.warnings, []);
 });
 
 test("history supports undo redo reset and avoids phantom no-op commits", () => {
