@@ -111,11 +111,13 @@ is the fastest completed lap time.
 `Village Raid HDV 3` is an AI-only top-down village attack simulation. Its local
 combat snapshot is versioned `th3-2026-07-11-v2`, its geometry is versioned
 `th3-reference-layouts-v3`, and both are dated `2026-07-11`. Each specimen
-first composes exactly 70 housing spaces, then deploys one troop at a time around
-the village perimeter. The 37 -> 18 -> 7 network observes phase, time,
-destruction, five inventory ratios, five living-troop ratios, and three channels
-for each of eight spatial sectors. Its outputs score the five troop types, select
-a perimeter position, and open or close the deployment gate.
+first composes exactly 70 housing spaces, then deploys one troop at a time on
+any free grid cell that is more than one cell from every building. The
+building exclusion zone remains blocked after destruction. The 37 -> 18 -> 7
+network observes phase, time, destruction, five inventory ratios, five
+living-troop ratios, and three channels for each of eight spatial sectors. Its
+outputs score the five troop types, select a deployment cell, and open or
+close the deployment gate.
 
 Every specimen attacks three fixed layouts, sequentially: `farm-111`, `war-26`,
 and `defence-104`. Their gameplay topology is calibrated from references #111,

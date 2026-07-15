@@ -3432,7 +3432,7 @@ function createVillageRaidGame() {
     outputs: 7,
     inputLabels: RAID_INPUT_LABELS,
     inputDisplayLabels: RAID_INPUT_DISPLAY_LABELS,
-    outputLabels: ["barbarian", "archer", "giant", "goblin", "wall breaker", "perimeter", "deploy"],
+    outputLabels: ["barbarian", "archer", "giant", "goblin", "wall breaker", "deployment cell", "deploy"],
     outputLabel: "Raid",
     distanceLabel: "Destruction",
     championStorageKey: RAID_CHAMPION_STORAGE_KEY,

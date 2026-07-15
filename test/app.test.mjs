@@ -407,6 +407,8 @@ test("static app includes every primary control and asset reference", async () =
   assert.doesNotMatch(readme, /open, compartmented,\s+and central Town Hall/);
   assert.match(readme, /37[^\n]*18[^\n]*7/);
   assert.match(readme, /strict mean[^\n]*destruction/i);
+  assert.match(html, /case de deploiement[\s\S]*plus d'une case de chaque batiment/i);
+  assert.match(readme, /any free grid cell[\s\S]*more than one cell from every building/i);
   assert.match(readme, /clashofclans\.fandom\.com/);
   assert.match(readme, /clash\.ninja/);
   assert.match(readme, /\| Town Hall \| 1 \| 3 \| 1600 \|/);
@@ -781,7 +783,7 @@ test("game picker switches to AI-only Village Raid with its profile and HUD", as
   assert.equal(labels.includes("sector 1: hp/threat/walls"), true);
   assert.equal(labels.includes("sector 8: hp/threat/walls"), true);
   assert.equal(labels.includes("sector 1 threat"), false);
-  for (const output of ["barbarian", "archer", "giant", "goblin", "wall breaker", "perimeter", "deploy"]) {
+  for (const output of ["barbarian", "archer", "giant", "goblin", "wall breaker", "deployment cell", "deploy"]) {
     assert.equal(labels.includes(output), true, `missing network output ${output}`);
   }
 
