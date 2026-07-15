@@ -392,6 +392,33 @@ test("a living cached protective wall is reevaluated after an unrelated navigati
   assert.ok(world.metrics.pathSearches > searchesBeforeRevision);
 });
 
+test("wall breakers damage every wall in their 3x3 blast square", () => {
+  const composition = { barbarian: 0, archer: 0, giant: 0, goblin: 0, wallBreaker: 1 };
+  const world = stripWorld(createRaidWorld("farm-111", composition));
+  world.buildings.splice(1);
+  Object.assign(world.buildings[0], { x: 8, y: 4, width: 1, height: 1 });
+  world.walls.push(
+    { id: "center", type: "wall", x: 4, y: 4, hp: 700, maxHp: 700 },
+    { id: "diagonal", type: "wall", x: 5, y: 5, hp: 700, maxHp: 700 },
+    { id: "edge", type: "wall", x: 3, y: 4, hp: 700, maxHp: 700 },
+    { id: "outside", type: "wall", x: 6, y: 4, hp: 700, maxHp: 700 },
+  );
+  const breaker = deployTroop(world, "wallBreaker", 0);
+  Object.assign(breaker, {
+    x: 4,
+    y: 4,
+    targetId: "center",
+    protectiveSearchRevision: world.navigationRevision,
+  });
+
+  stepRaid(world);
+
+  assert.equal(breaker.alive, false);
+  assert.deepEqual(world.walls.map(({ id, hp }) => [id, hp]), [
+    ["center", 300], ["diagonal", 300], ["edge", 300], ["outside", 700],
+  ]);
+});
+
 test("archers attack across walls without walking through them", () => {
   const world = stripWorld(createRaidWorld("farm-111", MIXED), { walls: true });
   world.buildings.splice(1);
@@ -441,6 +468,36 @@ test("mortar honors minimum range and applies splash on projectile impact", () =
   assert.equal(near.hp, near.maxHp, "minimum-range troop must not be targeted");
   assert.ok(far.hp < far.maxHp);
   assert.ok(neighbor.hp < neighbor.maxHp, "splash must damage nearby troop");
+});
+
+test("mortar damage includes the full 3x3 impact square", () => {
+  const world = stripWorld(createRaidWorld("farm-111", BARBARIANS));
+  const mortar = world.buildings.find((building) => building.type === "mortar");
+  world.buildings.splice(0, world.buildings.length, mortar);
+  mortar.nextAttackTick = Number.MAX_SAFE_INTEGER;
+  const movedTarget = {
+    id: "moved", type: "wallBreaker", x: 20, y: 20, hp: 20, maxHp: 20, alive: true,
+  };
+  const diagonal = {
+    id: "diagonal", type: "wallBreaker", x: 4.49, y: 1.49, hp: 20, maxHp: 20, alive: true,
+  };
+  world.troops.push(movedTarget, diagonal);
+  world.projectiles.push({
+    id: "mortar-impact",
+    impactTick: 0,
+    createdTick: 0,
+    targetX: 3,
+    targetY: 0,
+    x: 3,
+    y: 0,
+    damage: 20,
+    splashRadius: 1.5,
+  });
+
+  stepRaid(world);
+
+  assert.equal(movedTarget.hp, movedTarget.maxHp);
+  assert.equal(diagonal.hp, 0, "the diagonal cell belongs to the 3x3 impact square");
 });
 
 test("projectiles travel from the defense to a fixed impact point instead of homing", () => {

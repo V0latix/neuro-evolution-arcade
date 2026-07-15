@@ -313,7 +313,11 @@ function findTroopTarget(world, troop) {
 function attackWithTroop(world, troop, target) {
   if (world.tick < troop.nextAttackTick) return;
   if (troop.type === "wallBreaker") {
-    damageRaidEntity(world, target, TROOPS.wallBreaker.wallDamage);
+    for (const wall of world.walls) {
+      if (wall.hp > 0 && isInGridSquare(wall, target)) {
+        damageRaidEntity(world, wall, TROOPS.wallBreaker.wallDamage);
+      }
+    }
     troop.hp = 0;
     troop.alive = false;
     return;
@@ -504,10 +508,11 @@ function updateProjectiles(world) {
     }
     projectile.x = projectile.targetX;
     projectile.y = projectile.targetY;
-    const hitRadius = projectile.splashRadius > 0 ? projectile.splashRadius : 0.45;
-    const victims = world.troops.filter(
-      (troop) => troop.alive && pointDistance(troop, projectile) <= hitRadius,
-    );
+    const victims = projectile.splashRadius > 0
+      ? world.troops.filter((troop) => troop.alive && isInGridSquare(troop, projectile))
+      : world.troops.filter(
+        (troop) => troop.alive && pointDistance(troop, projectile) <= 0.45,
+      );
     for (const victim of victims) damageTroop(victim, projectile.damage);
   }
   world.projectiles = remaining;
@@ -584,6 +589,12 @@ function neighbors(cell, grid) {
 
 function cellOf(point) {
   return { x: Math.round(point.x), y: Math.round(point.y) };
+}
+
+function isInGridSquare(point, center, radius = 1) {
+  const cell = cellOf(point);
+  const impact = cellOf(center);
+  return Math.abs(cell.x - impact.x) <= radius && Math.abs(cell.y - impact.y) <= radius;
 }
 
 function keyOf({ x, y }) {
