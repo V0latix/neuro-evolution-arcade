@@ -124,6 +124,12 @@ test("the dated TH3 snapshot exposes the complete maxed roster", () => {
     { dps: 19, attackInterval: 0.5 },
   );
   assert.deepEqual(
+    Object.fromEntries(
+      ["cannon", "archerTower", "mortar"].map((id) => [id, BUILDING_DEFINITIONS[id].range]),
+    ),
+    { cannon: 9, archerTower: 10, mortar: 11 },
+  );
+  assert.deepEqual(
     pick(BUILDING_DEFINITIONS.mortar, [
       "dps",
       "damage",

@@ -159,9 +159,13 @@ layout has a different roster. Walls and bombs are not part of this denominator.
 | Archer Tower | 1 | 3 | 460 | 19 | 10 | 0.5 s |
 | Mortar | 1 | 1 | 400 | 4 | 11 | 5 s |
 
-The Mortar deals 20 damage per shot, with minimum range 4 and splash radius 1.5.
-The village also contains 50 walls at level 3 with 400 HP each, and 2 bombs at
-level 2 dealing 24 damage, with trigger radius 1.5 and damage radius 3.
+The Mortar deals 20 damage per shot, with minimum range 4 and maximum range 11.
+It fires at the target position captured at launch, then damages every troop in
+the 3x3 grid square around that impact point; a moving troop can leave the
+square and avoid the shell. A level-1 Wall Breaker likewise explodes once for
+400 damage to every wall in its own 3x3 grid square. The village also contains
+50 walls at level 3 with 400 HP each, and 2 bombs at level 2 dealing 24 damage,
+with trigger radius 1.5 and damage radius 3.
 
 | Troop | Level | DPS | HP | Housing | Specialization |
 | --- | ---: | ---: | ---: | ---: | --- |

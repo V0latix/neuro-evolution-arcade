@@ -447,6 +447,37 @@ test("single-target defenses respect range and cadence", () => {
   assert.ok(troop.hp < troop.maxHp);
 });
 
+test("defenses use their documented inclusive range limits", () => {
+  const cases = [
+    ["cannon", 9, true], ["cannon", 9.01, false],
+    ["archerTower", 10, true], ["archerTower", 10.01, false],
+    ["mortar", 4, true], ["mortar", 3.99, false],
+    ["mortar", 11, true], ["mortar", 11.01, false],
+  ];
+  for (const [type, distance, shouldDamage] of cases) {
+    const world = stripWorld(createRaidWorld("farm-111", BARBARIANS));
+    const defense = world.buildings.find((building) => building.type === type);
+    world.buildings.splice(0, world.buildings.length, defense);
+    Object.assign(defense, { x: 0, y: 0, width: 3, height: 3, nextAttackTick: 0 });
+    const troop = {
+      id: "range-target",
+      type: "wallBreaker",
+      x: 1 + distance,
+      y: 1,
+      hp: 54,
+      maxHp: 54,
+      alive: true,
+      targetId: null,
+      protectiveSearchRevision: -1,
+    };
+    world.troops.push(troop);
+
+    run(world, 80);
+
+    assert.equal(troop.hp < troop.maxHp, shouldDamage, `${type} at ${distance}`);
+  }
+});
+
 test("mortar honors minimum range and applies splash on projectile impact", () => {
   const world = stripWorld(createRaidWorld("farm-111", BARBARIANS));
   const mortar = world.buildings.find((building) => building.type === "mortar");

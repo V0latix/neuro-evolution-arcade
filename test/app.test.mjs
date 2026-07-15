@@ -414,7 +414,9 @@ test("static app includes every primary control and asset reference", async () =
   assert.match(readme, /\| Cannon \| 2 \| 4 \| 500 \| 17 \| 9 \| 0\.8 s \|/);
   assert.match(readme, /\| Archer Tower \| 1 \| 3 \| 460 \| 19 \| 10 \| 0\.5 s \|/);
   assert.match(readme, /\| Mortar \| 1 \| 1 \| 400 \| 4 \| 11 \| 5 s \|/);
-  assert.match(readme, /minimum range 4[^\n]*splash radius 1\.5/i);
+  assert.match(readme, /minimum range 4[^\n]*maximum range 11/i);
+  assert.match(readme, /3x3 grid square around that impact point/i);
+  assert.match(readme, /Wall Breaker[\s\S]{0,200}3x3 grid square/i);
   assert.match(readme, /50 walls[\s\S]{0,60}level 3[\s\S]{0,60}400 HP/i);
   assert.match(readme, /2 bombs[\s\S]{0,60}level 2[\s\S]{0,60}24 damage[\s\S]{0,60}1\.5[\s\S]{0,60}3/i);
   for (const page of [
